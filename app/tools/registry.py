@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
+from app.audit import emit
 from app.schemas import LoanApplication
 from app.tools.policy import lookup_policy
 from app.tools.ratios import compute_ratios
@@ -108,17 +109,25 @@ class ToolContext:
         self.policy_hits: list[dict] = []
 
     def dispatch(self, name: str, args: dict) -> dict:
-        if name == "compute_ratios":
-            self.ratios = compute_ratios(self.application, **args)
-            return json.loads(self.ratios.model_dump_json())
-        if name == "lookup_policy":
-            res = lookup_policy(args["query"], args.get("k", 3))
-            payload = json.loads(res.model_dump_json())
-            self.policy_hits.extend(payload["hits"])
-            return payload
-        if name == "score_pd":
-            if self.ratios is None:
-                return {"error": "call compute_ratios before score_pd"}
-            self.risk = score_pd(self.application, self.ratios)
-            return json.loads(self.risk.model_dump_json())
-        raise ValueError(f"unknown tool {name!r}")
+        emit("tool", f"tool_call.{name}.start", {"input": args})
+        try:
+            if name == "compute_ratios":
+                self.ratios = compute_ratios(self.application, **args)
+                result = json.loads(self.ratios.model_dump_json())
+            elif name == "lookup_policy":
+                res = lookup_policy(args["query"], args.get("k", 3))
+                result = json.loads(res.model_dump_json())
+                self.policy_hits.extend(result["hits"])
+            elif name == "score_pd":
+                if self.ratios is None:
+                    result = {"error": "call compute_ratios before score_pd"}
+                else:
+                    self.risk = score_pd(self.application, self.ratios)
+                    result = json.loads(self.risk.model_dump_json())
+            else:
+                raise ValueError(f"unknown tool {name!r}")
+        except Exception as e:
+            emit("tool", f"tool_call.{name}.error", {"error": str(e)})
+            raise
+        emit("tool", f"tool_call.{name}.result", {"output": result})
+        return result

@@ -94,14 +94,18 @@ def _offline_decision(ctx: ToolContext) -> UnderwritingMemo:
 
 def run_offline(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTrace]:
     from app.agent.critic import review_memo
+    from app.audit import audit_run, emit
 
     t0 = time.perf_counter()
-    ctx = ToolContext(application)
-    ctx.dispatch("compute_ratios", {})
-    ctx.dispatch("lookup_policy", {"query": f"{application.product} eligibility"})
-    ctx.dispatch("score_pd", {"dti": ctx.ratios.dti, "pti": ctx.ratios.pti})  # type: ignore[union-attr]
-    memo = _offline_decision(ctx)
-    verdict = review_memo(memo, application)  # offline checks only (no client)
+    with audit_run(application.application_id):
+        ctx = ToolContext(application)
+        ctx.dispatch("compute_ratios", {})
+        ctx.dispatch("lookup_policy", {"query": f"{application.product} eligibility"})
+        ctx.dispatch("score_pd", {"dti": ctx.ratios.dti, "pti": ctx.ratios.pti})  # type: ignore[union-attr]
+        memo = _offline_decision(ctx)
+        verdict = review_memo(memo, application)
+        emit("critic", "critic.verdict", {"status": verdict.status, "issues": verdict.issues})
+        emit("system", "memo.finalized", {"decision": memo.decision})
     trace = AgentTrace(
         tool_calls=[{"name": "compute_ratios"}, {"name": "lookup_policy"}, {"name": "score_pd"}],
         latency_ms=int((time.perf_counter() - t0) * 1000),

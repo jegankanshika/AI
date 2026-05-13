@@ -20,6 +20,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agent.critic import review_memo
 from app.agent.prompts import SYSTEM_PROMPT
+from app.audit import audit_run, emit
 from app.schemas import LoanApplication, MemoCitation, UnderwritingMemo
 from app.tools.registry import TOOL_SCHEMAS, ToolContext
 
@@ -50,6 +51,7 @@ class AgentState(TypedDict, total=False):
 
 def _agent_node(state: AgentState) -> dict:
     client = state["client"]
+    emit("agent", "llm_call.start", {"model": MODEL, "turn": state.get("turns", 0) + 1})
     resp = client.messages.create(
         model=MODEL,
         max_tokens=1500,
@@ -57,6 +59,12 @@ def _agent_node(state: AgentState) -> dict:
         tools=TOOL_SCHEMAS,
         messages=state["messages"],
     )
+    emit("agent", "llm_call.result", {
+        "model": MODEL,
+        "stop_reason": resp.stop_reason,
+        "tokens_in": resp.usage.input_tokens,
+        "tokens_out": resp.usage.output_tokens,
+    })
     delta_msg = [{"role": "assistant", "content": resp.content}]
     return {
         "messages": delta_msg,
@@ -89,6 +97,11 @@ def _tools_node(state: AgentState) -> dict:
                 adverse_action_codes=block.input.get("adverse_action_codes", []),
                 citations=[MemoCitation(**c) for c in block.input.get("citations", [])],
             )
+            emit("agent", "memo.draft_submitted", {
+                "decision": draft_memo.decision,
+                "adverse_action_codes": draft_memo.adverse_action_codes,
+                "n_citations": len(draft_memo.citations),
+            })
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,
@@ -122,14 +135,20 @@ def _critic_node(state: AgentState) -> dict:
     draft = state["draft_memo"]
     assert draft is not None
     verdict = review_memo(draft, state["application"], state.get("client"))
+    emit("critic", "critic.verdict", {
+        "status": verdict.status, "issues": verdict.issues,
+    })
 
     if verdict.status == "pass":
+        emit("system", "memo.finalized", {"decision": draft.decision})
         return {"final_memo": draft, "critic_issues": []}
 
     revisions = state.get("revisions", 0)
-    # If we're out of revision budget, accept the draft and log the issues —
-    # never block a decision indefinitely; downstream review will catch it.
     if revisions >= MAX_REVISIONS:
+        emit("system", "memo.finalized", {
+            "decision": draft.decision,
+            "with_unresolved_issues": verdict.issues,
+        })
         return {"final_memo": draft, "critic_issues": verdict.issues}
 
     feedback = (
@@ -201,7 +220,8 @@ def run_live_graph(application: LoanApplication) -> tuple[UnderwritingMemo, dict
         "client": anthropic.Anthropic(),
     }
     t0 = time.perf_counter()
-    final: AgentState = graph.invoke(init, config={"recursion_limit": 2 * MAX_TURNS + 4})
+    with audit_run(application.application_id) as (run_id, _sink):
+        final: AgentState = graph.invoke(init, config={"recursion_limit": 2 * MAX_TURNS + 4})
     elapsed_ms = int((time.perf_counter() - t0) * 1000)
 
     if final.get("final_memo") is None:
@@ -214,5 +234,6 @@ def run_live_graph(application: LoanApplication) -> tuple[UnderwritingMemo, dict
         "turns": final.get("turns", 0),
         "revisions": final.get("revisions", 0),
         "critic_issues": final.get("critic_issues", []),
+        "run_id": run_id,
     }
     return final["final_memo"], trace  # type: ignore[return-value]
