@@ -1,28 +1,24 @@
-"""Agent runner — Anthropic tool-use loop plus a deterministic offline mode.
+"""Agent runner — LangGraph-orchestrated live path plus a deterministic offline mode.
 
-`run_agent(application, mode="live")` calls Claude; `mode="offline"` runs the
-same tools in a fixed order and produces a memo without an LLM. Offline mode
-exists so tests and CI don't need an API key.
+`run_agent(application, mode="live")` runs the LangGraph state machine in
+`app.agent.graph`. `mode="offline"` runs the same tools in a fixed order and
+produces a memo without an LLM. Offline mode exists so tests and CI don't
+need an API key.
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
 from dataclasses import dataclass, field
 from typing import Literal
 
-from app.agent.prompts import SYSTEM_PROMPT
 from app.schemas import (
     LoanApplication, MemoCitation, Ratios, RiskScore, UnderwritingMemo,
 )
-from app.tools.registry import TOOL_SCHEMAS, ToolContext
+from app.tools.registry import ToolContext
 
 logger = logging.getLogger(__name__)
-
-MODEL = "claude-opus-4-7"
-MAX_TURNS = 8
 
 
 @dataclass
@@ -108,83 +104,16 @@ def run_offline(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTr
 
 
 def run_live(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTrace]:
-    import anthropic  # imported lazily so offline path doesn't require the SDK at import time
+    """Live mode runs the LangGraph state machine defined in app.agent.graph."""
+    from app.agent.graph import run_live_graph
 
-    client = anthropic.Anthropic()
-    ctx = ToolContext(application)
-    trace = AgentTrace()
-    t0 = time.perf_counter()
-
-    messages: list[dict] = [
-        {
-            "role": "user",
-            "content": (
-                "Underwrite this application.\n\n"
-                f"```json\n{application.model_dump_json(indent=2)}\n```"
-            ),
-        }
-    ]
-
-    final_memo: UnderwritingMemo | None = None
-    for _ in range(MAX_TURNS):
-        resp = client.messages.create(
-            model=MODEL,
-            max_tokens=1500,
-            system=SYSTEM_PROMPT,
-            tools=TOOL_SCHEMAS,  # type: ignore[arg-type]
-            messages=messages,
-        )
-        trace.tokens_in += resp.usage.input_tokens
-        trace.tokens_out += resp.usage.output_tokens
-        messages.append({"role": "assistant", "content": resp.content})
-
-        if resp.stop_reason != "tool_use":
-            break
-
-        tool_results = []
-        for block in resp.content:
-            if block.type != "tool_use":
-                continue
-            trace.tool_calls.append({"name": block.name, "input": block.input})
-            if block.name == "submit_memo":
-                final_memo = UnderwritingMemo(
-                    application_id=application.application_id,
-                    decision=block.input["decision"],
-                    rationale=block.input["rationale"],
-                    ratios=ctx.ratios,             # type: ignore[arg-type]
-                    risk=ctx.risk,                 # type: ignore[arg-type]
-                    adverse_action_codes=block.input.get("adverse_action_codes", []),
-                    citations=[MemoCitation(**c) for c in block.input.get("citations", [])],
-                )
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": json.dumps({"status": "submitted"}),
-                })
-            else:
-                try:
-                    result = ctx.dispatch(block.name, block.input)
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": json.dumps(result),
-                    })
-                except Exception as e:
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": json.dumps({"error": str(e)}),
-                        "is_error": True,
-                    })
-        messages.append({"role": "user", "content": tool_results})
-
-        if final_memo is not None:
-            break
-
-    trace.latency_ms = int((time.perf_counter() - t0) * 1000)
-    if final_memo is None:
-        raise RuntimeError("agent terminated without submitting a memo")
-    return final_memo, trace
+    memo, trace_dict = run_live_graph(application)
+    return memo, AgentTrace(
+        tool_calls=trace_dict["tool_calls"],
+        tokens_in=trace_dict["tokens_in"],
+        tokens_out=trace_dict["tokens_out"],
+        latency_ms=trace_dict["latency_ms"],
+    )
 
 
 def run_agent(application: LoanApplication,
