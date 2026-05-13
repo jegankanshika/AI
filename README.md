@@ -17,7 +17,7 @@ and the scripts that generate them.
 | `INSTALL.md` | System + Python prerequisites and step-by-step setup. |
 | `requirements.txt` | Pinned Python dependencies. |
 | `training_data/` | Synthetic loan dataset, schema dictionary, generator script, and policy snippets used as the RAG corpus. |
-| `app/` | Agent vertical slice — schemas, deterministic tools (`extract_document`, `compute_ratios`, `lookup_policy`, `score_pd`, `check_hard_gates`), LangGraph orchestration with Haiku critic + OPA-style hard-gate adjudication, audit-event emission, FastAPI service, and offline eval. |
+| `app/` | Agent vertical slice — schemas, deterministic tools (`extract_document`, `compute_ratios`, `lookup_policy`, `score_pd`, `check_hard_gates`), LangGraph orchestration with Haiku critic + OPA-style hard-gate adjudication, audit-event emission, FastAPI service, **single-page underwriter UI** at `/`, and offline eval. |
 | `policies/` | Rego policy for hard gates — production-of-record for the deterministic decline rules. |
 | `tests/` | Pytest suite covering tools and the offline agent path (no API key needed). |
 
@@ -27,10 +27,15 @@ and the scripts that generate them.
 
 ```bash
 pip install -r requirements.txt
-pytest -q                                        # 8 tests, offline
+pytest                                           # offline test suite (35 unit + 2 live, live skipped without API key)
 python -m app.eval.run_eval --limit 30           # synthetic eval
-uvicorn app.api.main:app --reload                # POST /underwrite
+uvicorn app.api.main:app --reload                # serves the UI at http://localhost:8000/
 ```
+
+Open `http://localhost:8000/` for the underwriter UI: pick a preset
+(strong, thin file, sanctions hit, high DTI), tweak the form, and click
+**Underwrite** to see the rendered memo, ratios, PD breakdown, adverse-
+action codes, citations, and tool trace.
 
 Live mode (`run_agent(app, mode="live")`) uses `claude-opus-4-7` via the
 Anthropic SDK and requires `ANTHROPIC_API_KEY`. Offline mode uses a

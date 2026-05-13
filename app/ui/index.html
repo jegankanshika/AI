@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Credit Co-Pilot</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .badge { display:inline-flex; align-items:center; padding:.25rem .6rem; border-radius:9999px; font-weight:600; font-size:.75rem; letter-spacing:.02em; }
+    .chip { display:inline-flex; align-items:center; padding:.15rem .55rem; border-radius:.5rem; font-size:.75rem; background:#EEF2FF; color:#3730A3; margin:.15rem .15rem 0 0; }
+    pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.75rem; }
+    details > summary { cursor: pointer; user-select: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<header class="bg-[#0B3D91] text-white">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div>
+      <div class="text-lg font-bold tracking-tight">Credit Co-Pilot</div>
+      <div class="text-xs text-slate-200">Agentic loan underwriting assistant — human-in-the-loop</div>
+    </div>
+    <div id="health" class="text-xs text-slate-200">…</div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-5 gap-6">
+  <!-- LEFT: application form -->
+  <section class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+    <h2 class="font-semibold text-slate-800 mb-3">Application</h2>
+
+    <label class="text-xs text-slate-500">Preset</label>
+    <select id="preset" class="w-full mb-3 rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+      <option value="strong">Strong profile (likely approve)</option>
+      <option value="thin">Thin file (likely refer / decline)</option>
+      <option value="sanctions">Sanctions hit (hard-gate decline)</option>
+      <option value="high_dti">High DTI (hard-gate decline)</option>
+    </select>
+
+    <div class="grid grid-cols-2 gap-2 text-sm">
+      <div><label class="text-xs text-slate-500">Credit score</label>
+        <input id="credit_score" type="number" class="w-full rounded-md border border-slate-300 px-2 py-1.5"></div>
+      <div><label class="text-xs text-slate-500">Annual income</label>
+        <input id="annual_income" type="number" class="w-full rounded-md border border-slate-300 px-2 py-1.5"></div>
+      <div><label class="text-xs text-slate-500">Requested amount</label>
+        <input id="requested_amount" type="number" class="w-full rounded-md border border-slate-300 px-2 py-1.5"></div>
+      <div><label class="text-xs text-slate-500">Term (months)</label>
+        <input id="term_months" type="number" class="w-full rounded-md border border-slate-300 px-2 py-1.5"></div>
+      <div><label class="text-xs text-slate-500">Monthly housing</label>
+        <input id="monthly_housing_cost" type="number" class="w-full rounded-md border border-slate-300 px-2 py-1.5"></div>
+      <div><label class="text-xs text-slate-500">Delinquencies (24m)</label>
+        <input id="delinquencies_24m" type="number" class="w-full rounded-md border border-slate-300 px-2 py-1.5"></div>
+      <div><label class="text-xs text-slate-500">Age</label>
+        <input id="age" type="number" class="w-full rounded-md border border-slate-300 px-2 py-1.5"></div>
+      <div><label class="text-xs text-slate-500">State</label>
+        <input id="state" maxlength="2" class="w-full rounded-md border border-slate-300 px-2 py-1.5 uppercase"></div>
+      <div class="flex items-center mt-2">
+        <input id="sanctions_hit" type="checkbox" class="mr-2"><label class="text-xs">Sanctions hit</label>
+      </div>
+      <div class="flex items-center mt-2">
+        <input id="fraud_flag" type="checkbox" class="mr-2"><label class="text-xs">Fraud flag</label>
+      </div>
+    </div>
+
+    <details class="mt-3 text-xs text-slate-500">
+      <summary>Show full JSON</summary>
+      <pre id="json_preview" class="mt-2 bg-slate-50 border border-slate-200 rounded p-2 overflow-x-auto"></pre>
+    </details>
+
+    <button id="run" class="mt-4 w-full bg-[#0B3D91] hover:bg-[#102f73] text-white font-semibold rounded-md py-2 disabled:opacity-50">
+      Underwrite
+    </button>
+    <div id="status" class="text-xs text-slate-500 mt-2 min-h-[1.25rem]"></div>
+  </section>
+
+  <!-- RIGHT: results -->
+  <section class="lg:col-span-3 space-y-4">
+    <div id="empty_state" class="bg-white rounded-xl shadow-sm border border-dashed border-slate-300 p-8 text-center text-slate-500">
+      Pick a preset and click <b>Underwrite</b> to see the agent's recommendation.
+    </div>
+    <div id="results" class="hidden space-y-4"></div>
+  </section>
+</main>
+
+<script>
+const PRESETS = {
+  strong: {
+    application_id: "ui-strong",
+    applicant_id: "ui-applicant-1",
+    age: 38, state: "CA", employment_status: "employed",
+    years_employed: 8.0, annual_income: 110000.0, monthly_housing_cost: 2400.0,
+    product: "personal_loan", requested_amount: 18000.0, term_months: 48,
+    purpose: "debt_consolidation",
+    bureau: { credit_score: 765, revolving_utilization: 0.18, open_trades: 9,
+              delinquencies_24m: 0, inquiries_6m: 1, bankruptcies_7y: 0,
+              oldest_trade_months: 180 },
+  },
+  thin: {
+    application_id: "ui-thin",
+    applicant_id: "ui-applicant-2",
+    age: 24, state: "TX", employment_status: "employed",
+    years_employed: 1.0, annual_income: 38000.0, monthly_housing_cost: 1200.0,
+    product: "personal_loan", requested_amount: 15000.0, term_months: 36,
+    purpose: "debt_consolidation",
+    bureau: { credit_score: 605, revolving_utilization: 0.65, open_trades: 3,
+              delinquencies_24m: 1, inquiries_6m: 4, bankruptcies_7y: 0,
+              oldest_trade_months: 22 },
+  },
+  sanctions: {
+    application_id: "ui-sanctions",
+    applicant_id: "ui-applicant-3",
+    age: 40, state: "NY", employment_status: "employed",
+    years_employed: 10.0, annual_income: 95000.0, monthly_housing_cost: 2200.0,
+    product: "personal_loan", requested_amount: 12000.0, term_months: 36,
+    purpose: "home_improvement",
+    bureau: { credit_score: 740, revolving_utilization: 0.22, open_trades: 8,
+              delinquencies_24m: 0, inquiries_6m: 1, bankruptcies_7y: 0,
+              oldest_trade_months: 160 },
+    sanctions_hit: true,
+  },
+  high_dti: {
+    application_id: "ui-high-dti",
+    applicant_id: "ui-applicant-4",
+    age: 33, state: "FL", employment_status: "employed",
+    years_employed: 3.0, annual_income: 36000.0, monthly_housing_cost: 1600.0,
+    product: "personal_loan", requested_amount: 28000.0, term_months: 36,
+    purpose: "debt_consolidation",
+    bureau: { credit_score: 680, revolving_utilization: 0.45, open_trades: 6,
+              delinquencies_24m: 0, inquiries_6m: 2, bankruptcies_7y: 0,
+              oldest_trade_months: 80 },
+  },
+};
+
+const $ = (id) => document.getElementById(id);
+
+function loadPreset(name) {
+  const p = PRESETS[name];
+  $("credit_score").value = p.bureau.credit_score;
+  $("annual_income").value = p.annual_income;
+  $("requested_amount").value = p.requested_amount;
+  $("term_months").value = p.term_months;
+  $("monthly_housing_cost").value = p.monthly_housing_cost;
+  $("delinquencies_24m").value = p.bureau.delinquencies_24m;
+  $("age").value = p.age;
+  $("state").value = p.state;
+  $("sanctions_hit").checked = !!p.sanctions_hit;
+  $("fraud_flag").checked = !!p.fraud_flag;
+  refreshJson();
+}
+
+function currentApplication() {
+  const base = PRESETS[$("preset").value];
+  const app = JSON.parse(JSON.stringify(base));
+  app.bureau.credit_score = +$("credit_score").value;
+  app.annual_income = +$("annual_income").value;
+  app.requested_amount = +$("requested_amount").value;
+  app.term_months = +$("term_months").value;
+  app.monthly_housing_cost = +$("monthly_housing_cost").value;
+  app.bureau.delinquencies_24m = +$("delinquencies_24m").value;
+  app.age = +$("age").value;
+  app.state = ($("state").value || "CA").toUpperCase();
+  app.sanctions_hit = $("sanctions_hit").checked;
+  app.fraud_flag = $("fraud_flag").checked;
+  return app;
+}
+
+function refreshJson() {
+  $("json_preview").textContent = JSON.stringify(currentApplication(), null, 2);
+}
+
+document.querySelectorAll("input, select").forEach((el) => el.addEventListener("input", refreshJson));
+$("preset").addEventListener("change", (e) => loadPreset(e.target.value));
+
+function decisionBadge(d) {
+  const map = {
+    approve: { txt: "APPROVE", cls: "bg-emerald-100 text-emerald-800" },
+    decline: { txt: "DECLINE", cls: "bg-rose-100 text-rose-800" },
+    refer_to_human: { txt: "REFER", cls: "bg-amber-100 text-amber-800" },
+  };
+  const m = map[d] || { txt: d, cls: "bg-slate-100 text-slate-800" };
+  return `<span class="badge ${m.cls}">${m.txt}</span>`;
+}
+
+function fmtMoney(n) {
+  if (n == null) return "—";
+  return "$" + Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+function fmtPct(n) {
+  if (n == null) return "—";
+  return (Number(n) * 100).toFixed(1) + "%";
+}
+
+function renderResult(data) {
+  const { memo, trace } = data;
+  const codes = (memo.adverse_action_codes || []).map((c) => `<span class="chip">${c}</span>`).join("");
+  const citations = (memo.citations || []).map((c) =>
+    `<li class="text-xs text-slate-600"><span class="font-mono text-slate-500">${c.source}</span> — ${c.detail}</li>`
+  ).join("");
+  const trace_rows = (trace.tool_calls || []).map((t) =>
+    `<li class="text-xs"><span class="font-mono text-indigo-700">${t.name}</span> ${t.input ? `<span class="text-slate-500">${JSON.stringify(t.input)}</span>` : ""}</li>`
+  ).join("");
+  const critic_issues = (trace.critic_issues || []).map((i) => `<li class="text-xs text-amber-700">${i}</li>`).join("");
+
+  const ratios = memo.ratios || {};
+  const risk = memo.risk || {};
+  const tops = (risk.top_factors || []).map((f) => `<span class="chip">${f}</span>`).join("");
+
+  return `
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-xs text-slate-500">Application ${memo.application_id}</div>
+          <div class="text-lg font-semibold mt-1">${decisionBadge(memo.decision)}</div>
+        </div>
+        <div class="text-right text-xs text-slate-500">
+          turns ${trace.turns ?? "—"} · revisions ${trace.revisions ?? 0}<br>
+          ${trace.tokens_in ?? 0} in / ${trace.tokens_out ?? 0} out · ${trace.latency_ms ?? 0} ms
+        </div>
+      </div>
+      <p class="mt-3 text-sm text-slate-700 whitespace-pre-wrap">${memo.rationale}</p>
+      ${codes ? `<div class="mt-3">${codes}</div>` : ""}
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <div class="text-xs uppercase tracking-wide text-slate-500 font-semibold">Ratios</div>
+        <dl class="mt-2 text-sm space-y-1">
+          <div class="flex justify-between"><dt class="text-slate-500">Monthly payment</dt><dd>${fmtMoney(ratios.monthly_payment)}</dd></div>
+          <div class="flex justify-between"><dt class="text-slate-500">PTI</dt><dd>${fmtPct(ratios.pti)}</dd></div>
+          <div class="flex justify-between"><dt class="text-slate-500">DTI</dt><dd>${fmtPct(ratios.dti)}</dd></div>
+          <div class="flex justify-between"><dt class="text-slate-500">LTV</dt><dd>${ratios.ltv != null ? fmtPct(ratios.ltv) : "—"}</dd></div>
+        </dl>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <div class="text-xs uppercase tracking-wide text-slate-500 font-semibold">Risk</div>
+        <dl class="mt-2 text-sm space-y-1">
+          <div class="flex justify-between"><dt class="text-slate-500">PD</dt><dd>${fmtPct(risk.pd)}</dd></div>
+          <div class="flex justify-between"><dt class="text-slate-500">Model</dt><dd class="font-mono text-xs">${risk.model_version || "—"}</dd></div>
+        </dl>
+        ${tops ? `<div class="mt-2 text-xs text-slate-500">Top factors</div><div>${tops}</div>` : ""}
+      </div>
+    </div>
+
+    ${citations ? `
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <div class="text-xs uppercase tracking-wide text-slate-500 font-semibold">Citations</div>
+      <ul class="mt-2 space-y-1">${citations}</ul>
+    </div>` : ""}
+
+    ${critic_issues ? `
+    <div class="bg-amber-50 rounded-xl border border-amber-200 p-4">
+      <div class="text-xs uppercase tracking-wide text-amber-800 font-semibold">Critic flagged (resolved or accepted)</div>
+      <ul class="mt-2 space-y-1">${critic_issues}</ul>
+    </div>` : ""}
+
+    <details class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <summary class="text-xs uppercase tracking-wide text-slate-500 font-semibold">Tool trace</summary>
+      <ul class="mt-2 space-y-1">${trace_rows}</ul>
+    </details>
+  `;
+}
+
+async function underwrite() {
+  $("run").disabled = true;
+  $("status").textContent = "Calling /underwrite…";
+  $("empty_state").classList.add("hidden");
+  try {
+    const resp = await fetch("/underwrite", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(currentApplication()),
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+    const data = await resp.json();
+    $("results").innerHTML = renderResult(data);
+    $("results").classList.remove("hidden");
+    $("status").textContent = "Done.";
+  } catch (e) {
+    $("results").innerHTML = `<div class="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-4 text-sm">${e.message}</div>`;
+    $("results").classList.remove("hidden");
+    $("status").textContent = "Failed.";
+  } finally {
+    $("run").disabled = false;
+  }
+}
+
+async function pingHealth() {
+  try {
+    const r = await fetch("/healthz");
+    const j = await r.json();
+    $("health").textContent = j.status === "ok" ? "API ✓" : "API ?";
+  } catch {
+    $("health").textContent = "API offline";
+  }
+}
+
+$("run").addEventListener("click", underwrite);
+loadPreset("strong");
+pingHealth();
+</script>
+</body>
+</html>
