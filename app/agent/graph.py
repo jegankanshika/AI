@@ -18,12 +18,14 @@ from typing import Annotated, Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from app.agent.critic import review_memo
 from app.agent.prompts import SYSTEM_PROMPT
 from app.schemas import LoanApplication, MemoCitation, UnderwritingMemo
 from app.tools.registry import TOOL_SCHEMAS, ToolContext
 
 MODEL = "claude-opus-4-7"
 MAX_TURNS = 8
+MAX_REVISIONS = 1
 
 
 def _append(left: list, right: list) -> list:
@@ -38,7 +40,10 @@ class AgentState(TypedDict, total=False):
     tokens_in: int
     tokens_out: int
     turns: int
+    draft_memo: UnderwritingMemo | None
     final_memo: UnderwritingMemo | None
+    revisions: int
+    critic_issues: Annotated[list[str], _append]
     stop_reason: str
     client: Any  # anthropic.Anthropic — typed loosely to keep the import lazy
 
@@ -67,7 +72,7 @@ def _tools_node(state: AgentState) -> dict:
     last = state["messages"][-1]["content"]
     tool_results: list[dict] = []
     tool_calls_delta: list[dict] = []
-    final_memo: UnderwritingMemo | None = None
+    draft_memo: UnderwritingMemo | None = None
 
     for block in last:
         if getattr(block, "type", None) != "tool_use":
@@ -75,7 +80,7 @@ def _tools_node(state: AgentState) -> dict:
         tool_calls_delta.append({"name": block.name, "input": block.input})
 
         if block.name == "submit_memo":
-            final_memo = UnderwritingMemo(
+            draft_memo = UnderwritingMemo(
                 application_id=state["application"].application_id,
                 decision=block.input["decision"],
                 rationale=block.input["rationale"],
@@ -87,7 +92,7 @@ def _tools_node(state: AgentState) -> dict:
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,
-                "content": json.dumps({"status": "submitted"}),
+                "content": json.dumps({"status": "submitted, pending critic"}),
             })
             continue
 
@@ -109,7 +114,35 @@ def _tools_node(state: AgentState) -> dict:
     return {
         "messages": [{"role": "user", "content": tool_results}],
         "tool_calls": tool_calls_delta,
-        "final_memo": final_memo,
+        "draft_memo": draft_memo,
+    }
+
+
+def _critic_node(state: AgentState) -> dict:
+    draft = state["draft_memo"]
+    assert draft is not None
+    verdict = review_memo(draft, state["application"], state.get("client"))
+
+    if verdict.status == "pass":
+        return {"final_memo": draft, "critic_issues": []}
+
+    revisions = state.get("revisions", 0)
+    # If we're out of revision budget, accept the draft and log the issues —
+    # never block a decision indefinitely; downstream review will catch it.
+    if revisions >= MAX_REVISIONS:
+        return {"final_memo": draft, "critic_issues": verdict.issues}
+
+    feedback = (
+        "The critic rejected the draft memo. Address these issues and call "
+        "`submit_memo` again:\n- " + "\n- ".join(verdict.issues)
+    )
+    if verdict.suggested_fix:
+        feedback += f"\n\nSuggested fix: {verdict.suggested_fix}"
+    return {
+        "messages": [{"role": "user", "content": feedback}],
+        "critic_issues": verdict.issues,
+        "revisions": revisions + 1,
+        "draft_memo": None,
     }
 
 
@@ -122,6 +155,12 @@ def _route_after_agent(state: AgentState) -> str:
 
 
 def _route_after_tools(state: AgentState) -> str:
+    if state.get("draft_memo") is not None:
+        return "critic"
+    return "agent"
+
+
+def _route_after_critic(state: AgentState) -> str:
     if state.get("final_memo") is not None:
         return END
     return "agent"
@@ -131,9 +170,13 @@ def build_graph():
     g = StateGraph(AgentState)
     g.add_node("agent", _agent_node)
     g.add_node("tools", _tools_node)
+    g.add_node("critic", _critic_node)
     g.add_edge(START, "agent")
     g.add_conditional_edges("agent", _route_after_agent, {"tools": "tools", END: END})
-    g.add_conditional_edges("tools", _route_after_tools, {"agent": "agent", END: END})
+    g.add_conditional_edges("tools", _route_after_tools,
+                            {"agent": "agent", "critic": "critic"})
+    g.add_conditional_edges("critic", _route_after_critic,
+                            {"agent": "agent", END: END})
     return g.compile()
 
 
@@ -169,5 +212,7 @@ def run_live_graph(application: LoanApplication) -> tuple[UnderwritingMemo, dict
         "tokens_out": final.get("tokens_out", 0),
         "latency_ms": elapsed_ms,
         "turns": final.get("turns", 0),
+        "revisions": final.get("revisions", 0),
+        "critic_issues": final.get("critic_issues", []),
     }
     return final["final_memo"], trace  # type: ignore[return-value]

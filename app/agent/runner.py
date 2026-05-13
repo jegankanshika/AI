@@ -27,6 +27,8 @@ class AgentTrace:
     tokens_in: int = 0
     tokens_out: int = 0
     latency_ms: int = 0
+    revisions: int = 0
+    critic_issues: list[str] = field(default_factory=list)
 
 
 def _adverse_codes(app: LoanApplication, ratios: Ratios, risk: RiskScore) -> list[str]:
@@ -91,16 +93,21 @@ def _offline_decision(ctx: ToolContext) -> UnderwritingMemo:
 
 
 def run_offline(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTrace]:
+    from app.agent.critic import review_memo
+
     t0 = time.perf_counter()
     ctx = ToolContext(application)
     ctx.dispatch("compute_ratios", {})
     ctx.dispatch("lookup_policy", {"query": f"{application.product} eligibility"})
     ctx.dispatch("score_pd", {"dti": ctx.ratios.dti, "pti": ctx.ratios.pti})  # type: ignore[union-attr]
+    memo = _offline_decision(ctx)
+    verdict = review_memo(memo, application)  # offline checks only (no client)
     trace = AgentTrace(
         tool_calls=[{"name": "compute_ratios"}, {"name": "lookup_policy"}, {"name": "score_pd"}],
         latency_ms=int((time.perf_counter() - t0) * 1000),
+        critic_issues=verdict.issues,
     )
-    return _offline_decision(ctx), trace
+    return memo, trace
 
 
 def run_live(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTrace]:
@@ -113,6 +120,8 @@ def run_live(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTrace
         tokens_in=trace_dict["tokens_in"],
         tokens_out=trace_dict["tokens_out"],
         latency_ms=trace_dict["latency_ms"],
+        revisions=trace_dict.get("revisions", 0),
+        critic_issues=trace_dict.get("critic_issues", []),
     )
 
 
