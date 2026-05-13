@@ -35,6 +35,11 @@ Live mode (`run_agent(app, mode="live")`) uses `claude-opus-4-7` via the
 Anthropic SDK and requires `ANTHROPIC_API_KEY`. Offline mode uses a
 deterministic rule path so CI runs without secrets.
 
+### CI
+
+- `.github/workflows/ci.yml` — runs `pytest -m "not live"` on every push and PR (Python 3.11 + 3.12 matrix).
+- `.github/workflows/live-tests.yml` — manual `workflow_dispatch` trigger that runs the live integration tests with `secrets.ANTHROPIC_API_KEY`. Enable the nightly cron once a token budget alert is in place.
+
 ---
 
 ## Credit Co-Pilot — at a glance

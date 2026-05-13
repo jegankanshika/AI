@@ -1,0 +1,36 @@
+# Live integration tests against the real Anthropic API.
+#
+# Manual trigger only — these tests cost tokens, so we don't run them on
+# every PR. Enable a nightly cron later by uncommenting the schedule block
+# once a budget alert is in place.
+#
+# Requires the `ANTHROPIC_API_KEY` repository secret.
+
+name: Live tests
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: "0 6 * * *"  # 06:00 UTC nightly
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run live tests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: pytest -m live -v
