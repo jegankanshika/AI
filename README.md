@@ -14,8 +14,6 @@ and the scripts that generate them.
 | `credit_copilot_design.md` | Markdown source of the Credit Co-Pilot high-level design (architecture, tech stack, data model, sequence flow, compliance, rollout). |
 | `CreditCoPilot_Design.pdf` | Branded multi-page PDF of the design — cover page, exec summary + KPIs, full-page architecture figure, components, tech stack, tool surface, sequence, compliance, rollout, open questions. |
 | `credit_copilot_architecture.png` / `.pdf` | Standalone architecture diagram with logos for Claude, AWS (EKS, S3, KMS, Textract, SageMaker, API Gateway), Postgres, Kafka, Temporal, Redis, OpenSearch, MLflow, OPA, Auth0, FastAPI, React, Terraform, GitHub Actions, Datadog, Langfuse, Slack. |
-| `build_diagram.py` | Reproducible script — generates the architecture diagram via `mingrammer/diagrams` + Graphviz. |
-| `build_pdf.py` | Reproducible script — composes the branded design PDF via ReportLab. |
 
 ---
 
