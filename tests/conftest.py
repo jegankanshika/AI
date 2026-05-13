@@ -73,3 +73,103 @@ def paystub_pdf_factory(tmp_path: Path) -> Callable[..., Path]:
         return path
 
     return _make
+
+
+def _draw_w2(path: Path, *,
+             employer: str = "ACME CORP",
+             employee: str = "Jane Doe",
+             ein: str = "12-3456789",
+             ssn_last4: str = "1234",
+             tax_year: int = 2025,
+             wages_box1: float = 96_500.00,
+             federal_tax: float = 12_400.00,
+             ss_wages: float = 96_500.00,
+             medicare_wages: float = 96_500.00) -> None:
+    c = canvas.Canvas(str(path), pagesize=LETTER)
+    w, h = LETTER
+    y = h - 1 * inch
+
+    def line(text: str, dy: float = 0.25 * inch, bold: bool = False) -> None:
+        nonlocal y
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", 11)
+        c.drawString(1 * inch, y, text)
+        y -= dy
+
+    line("Form W-2 Wage and Tax Statement", bold=True)
+    line(f"Tax Year: {tax_year}")
+    line(f"c Employer's name: {employer}")
+    line(f"EIN: {ein}")
+    line(f"Employee's name: {employee}")
+    line(f"SSN: ***-**-{ssn_last4}")
+    y -= 0.2 * inch
+    line(f"Box 1 Wages, tips, other compensation: ${wages_box1:,.2f}")
+    line(f"Box 2 Federal income tax withheld: ${federal_tax:,.2f}")
+    line(f"Box 3 Social security wages: ${ss_wages:,.2f}")
+    line(f"Box 5 Medicare wages and tips: ${medicare_wages:,.2f}")
+    c.save()
+
+
+def _draw_bank_statement(path: Path, *,
+                         bank: str = "First National Bank",
+                         holder: str = "Jane Doe",
+                         account_last4: str = "5678",
+                         period: tuple[str, str] = ("03/01/2026", "03/31/2026"),
+                         opening: float = 5_200.00,
+                         deposits: list[tuple[str, str, float]] | None = None,
+                         withdrawals: list[tuple[str, str, float]] | None = None) -> None:
+    if deposits is None:
+        deposits = [
+            ("03/05/2026", "ACME CORP PAYROLL", 2_543.18),
+            ("03/19/2026", "ACME CORP PAYROLL", 2_543.18),
+        ]
+    if withdrawals is None:
+        withdrawals = [
+            ("03/02/2026", "RENT PAYMENT", 1_900.00),
+            ("03/15/2026", "GROCERIES", 412.55),
+            ("03/22/2026", "AUTO LOAN", 387.20),
+        ]
+    total_d = sum(a for _, _, a in deposits)
+    total_w = sum(a for _, _, a in withdrawals)
+    closing = round(opening + total_d - total_w, 2)
+
+    c = canvas.Canvas(str(path), pagesize=LETTER)
+    w, h = LETTER
+    y = h - 1 * inch
+
+    def line(text: str, dy: float = 0.22 * inch, bold: bool = False) -> None:
+        nonlocal y
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", 10)
+        c.drawString(0.8 * inch, y, text)
+        y -= dy
+
+    line(bank, bold=True)
+    line(f"Bank: {bank}")
+    line(f"Account Holder: {holder}")
+    line(f"Account Number: ****{account_last4}")
+    line(f"Statement Period: {period[0]} - {period[1]}")
+    y -= 0.15 * inch
+    line(f"Opening Balance: ${opening:,.2f}")
+    line(f"Total Deposits: ${total_d:,.2f}")
+    line(f"Total Withdrawals: ${total_w:,.2f}")
+    line(f"Closing Balance: ${closing:,.2f}", bold=True)
+    y -= 0.2 * inch
+    line("Transactions", bold=True)
+    for d, desc, amt in deposits:
+        line(f"{d}    {desc}    ${amt:,.2f}    C")
+    for d, desc, amt in withdrawals:
+        line(f"{d}    {desc}    ${amt:,.2f}    D")
+    c.save()
+
+
+@pytest.fixture
+def w2_pdf(tmp_path: Path) -> Path:
+    path = tmp_path / "w2_standard.pdf"
+    _draw_w2(path)
+    return path
+
+
+@pytest.fixture
+def bank_statement_pdf(tmp_path: Path) -> Path:
+    path = tmp_path / "bank_statement.pdf"
+    _draw_bank_statement(path)
+    return path
