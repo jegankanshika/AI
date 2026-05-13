@@ -6,6 +6,11 @@ fastapi>=0.136.0
 uvicorn>=0.46.0
 pydantic>=2.13.0
 
+# document intelligence
+pypdf>=6.0.0
+reportlab>=4.5.0
+cffi>=2.0.0
+
 # data generation
 faker==30.8.2
 numpy==2.1.3

@@ -9,6 +9,7 @@ import json
 from typing import Any, Callable
 
 from app.audit import emit
+from app.idp.extractor import extract as extract_document_impl
 from app.policy.gates import evaluate_hard_gates
 from app.schemas import LoanApplication
 from app.tools.policy import lookup_policy
@@ -66,6 +67,22 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "extract_document",
+        "description": (
+            "Extract structured fields from a document attached to the "
+            "application (paystub, W-2, bank statement, photo ID). "
+            "Returns fields + confidence + warnings. Use to verify income "
+            "(annualized_income from a paystub) against the stated annual_income."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "doc_id": {"type": "string", "description": "id of an attached document"},
+            },
+            "required": ["doc_id"],
+        },
+    },
+    {
         "name": "check_hard_gates",
         "description": (
             "Evaluate deterministic hard-decline rules (sanctions, age, "
@@ -119,6 +136,7 @@ class ToolContext:
         self.risk = None    # type: ignore[assignment]
         self.policy_hits: list[dict] = []
         self.gate_result = None  # type: ignore[assignment]
+        self.extractions: dict[str, dict] = {}
 
     def dispatch(self, name: str, args: dict) -> dict:
         emit("tool", f"tool_call.{name}.start", {"input": args})
@@ -139,6 +157,15 @@ class ToolContext:
             elif name == "check_hard_gates":
                 self.gate_result = evaluate_hard_gates(self.application, self.ratios)
                 result = json.loads(self.gate_result.model_dump_json())
+            elif name == "extract_document":
+                doc_id = args["doc_id"]
+                ref = next((d for d in self.application.documents if d.doc_id == doc_id), None)
+                if ref is None:
+                    result = {"error": f"no document with doc_id={doc_id!r}"}
+                else:
+                    extraction = extract_document_impl(ref)
+                    result = json.loads(extraction.model_dump_json())
+                    self.extractions[doc_id] = result
             else:
                 raise ValueError(f"unknown tool {name!r}")
         except Exception as e:

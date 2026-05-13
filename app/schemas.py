@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import Literal, Optional
 from pydantic import BaseModel, Field, NonNegativeFloat, NonNegativeInt
 
+from app.idp.schemas import DocumentRef
+
 Product = Literal["personal_loan", "auto", "mortgage", "sm_business"]
 EmploymentStatus = Literal["employed", "self_employed", "retired", "unemployed", "student"]
 Decision = Literal["approve", "decline", "refer_to_human"]
@@ -37,6 +39,7 @@ class LoanApplication(BaseModel):
     # so existing fixtures keep working.
     sanctions_hit: bool = False
     fraud_flag: bool = False
+    documents: list[DocumentRef] = Field(default_factory=list)
 
 
 class Ratios(BaseModel):

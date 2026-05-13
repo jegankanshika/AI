@@ -17,7 +17,8 @@ and the scripts that generate them.
 | `INSTALL.md` | System + Python prerequisites and step-by-step setup. |
 | `requirements.txt` | Pinned Python dependencies. |
 | `training_data/` | Synthetic loan dataset, schema dictionary, generator script, and policy snippets used as the RAG corpus. |
-| `app/` | Agent vertical slice — schemas, deterministic tools (`compute_ratios`, `lookup_policy`, `score_pd`), Anthropic tool-use loop, FastAPI service, and offline eval. |
+| `app/` | Agent vertical slice — schemas, deterministic tools (`extract_document`, `compute_ratios`, `lookup_policy`, `score_pd`, `check_hard_gates`), LangGraph orchestration with Haiku critic + OPA-style hard-gate adjudication, audit-event emission, FastAPI service, and offline eval. |
+| `policies/` | Rego policy for hard gates — production-of-record for the deterministic decline rules. |
 | `tests/` | Pytest suite covering tools and the offline agent path (no API key needed). |
 
 ---
