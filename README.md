@@ -17,6 +17,23 @@ and the scripts that generate them.
 | `INSTALL.md` | System + Python prerequisites and step-by-step setup. |
 | `requirements.txt` | Pinned Python dependencies. |
 | `training_data/` | Synthetic loan dataset, schema dictionary, generator script, and policy snippets used as the RAG corpus. |
+| `app/` | Agent vertical slice — schemas, deterministic tools (`compute_ratios`, `lookup_policy`, `score_pd`), Anthropic tool-use loop, FastAPI service, and offline eval. |
+| `tests/` | Pytest suite covering tools and the offline agent path (no API key needed). |
+
+---
+
+## Run the agent
+
+```bash
+pip install -r requirements.txt
+pytest -q                                        # 8 tests, offline
+python -m app.eval.run_eval --limit 30           # synthetic eval
+uvicorn app.api.main:app --reload                # POST /underwrite
+```
+
+Live mode (`run_agent(app, mode="live")`) uses `claude-opus-4-7` via the
+Anthropic SDK and requires `ANTHROPIC_API_KEY`. Offline mode uses a
+deterministic rule path so CI runs without secrets.
 
 ---
 
