@@ -33,6 +33,10 @@ class LoanApplication(BaseModel):
     term_months: int = Field(ge=6, le=480)
     purpose: str
     bureau: BureauData
+    # External KYC/AML signals populated upstream of the agent. Default False
+    # so existing fixtures keep working.
+    sanctions_hit: bool = False
+    fraud_flag: bool = False
 
 
 class Ratios(BaseModel):

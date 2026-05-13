@@ -21,6 +21,7 @@ from langgraph.graph import END, START, StateGraph
 from app.agent.critic import review_memo
 from app.agent.prompts import SYSTEM_PROMPT
 from app.audit import audit_run, emit
+from app.policy.gates import evaluate_hard_gates
 from app.schemas import LoanApplication, MemoCitation, UnderwritingMemo
 from app.tools.registry import TOOL_SCHEMAS, ToolContext
 
@@ -140,16 +141,11 @@ def _critic_node(state: AgentState) -> dict:
     })
 
     if verdict.status == "pass":
-        emit("system", "memo.finalized", {"decision": draft.decision})
-        return {"final_memo": draft, "critic_issues": []}
+        return {"draft_memo": draft, "critic_issues": []}
 
     revisions = state.get("revisions", 0)
     if revisions >= MAX_REVISIONS:
-        emit("system", "memo.finalized", {
-            "decision": draft.decision,
-            "with_unresolved_issues": verdict.issues,
-        })
-        return {"final_memo": draft, "critic_issues": verdict.issues}
+        return {"draft_memo": draft, "critic_issues": verdict.issues}
 
     feedback = (
         "The critic rejected the draft memo. Address these issues and call "
@@ -180,9 +176,57 @@ def _route_after_tools(state: AgentState) -> str:
 
 
 def _route_after_critic(state: AgentState) -> str:
-    if state.get("final_memo") is not None:
-        return END
+    # critic_node leaves draft_memo set when the draft is ready to be
+    # adjudicated (pass, or revisions exhausted); otherwise it cleared
+    # draft_memo and asked the agent to revise.
+    if state.get("draft_memo") is not None:
+        return "adjudicate"
     return "agent"
+
+
+def _adjudicate_node(state: AgentState) -> dict:
+    """Final hard-gate adjudication. Overrides the draft if any gate fires.
+
+    This is the authoritative deterministic step: even if the agent and the
+    critic agree to approve, a hard-gate violation (sanctions, underage,
+    multiple bankruptcies, DTI > cap, LTV > cap, etc.) forces a decline
+    with the gate's reason codes appended to adverse_action_codes.
+    """
+    draft = state["draft_memo"]
+    assert draft is not None
+    ctx: ToolContext = state["ctx"]
+    gates = evaluate_hard_gates(state["application"], ctx.ratios)
+    emit("system", "hard_gates.evaluated", {
+        "backend": gates.backend,
+        "passed": gates.passed,
+        "violations": [v.model_dump() for v in gates.violations],
+    })
+
+    if gates.passed:
+        emit("system", "memo.finalized", {"decision": draft.decision})
+        return {"final_memo": draft}
+
+    forced_codes = [v.code for v in gates.violations]
+    merged_codes = list(dict.fromkeys(draft.adverse_action_codes + forced_codes))
+    gate_lines = "\n".join(f"- [{v.code}] {v.reason}" for v in gates.violations)
+    overridden = draft.model_copy(update={
+        "decision": "decline",
+        "adverse_action_codes": merged_codes,
+        "rationale": (
+            f"Hard-gate override: decision forced to DECLINE.\n{gate_lines}\n\n"
+            f"Original agent rationale: {draft.rationale}"
+        ),
+        "citations": draft.citations + [
+            MemoCitation(source="engine:hard_gates", detail=v.reason)
+            for v in gates.violations
+        ],
+    })
+    emit("system", "memo.overridden_by_gates", {
+        "original_decision": draft.decision,
+        "violations": [v.model_dump() for v in gates.violations],
+    })
+    emit("system", "memo.finalized", {"decision": overridden.decision})
+    return {"final_memo": overridden}
 
 
 def build_graph():
@@ -190,12 +234,14 @@ def build_graph():
     g.add_node("agent", _agent_node)
     g.add_node("tools", _tools_node)
     g.add_node("critic", _critic_node)
+    g.add_node("adjudicate", _adjudicate_node)
     g.add_edge(START, "agent")
     g.add_conditional_edges("agent", _route_after_agent, {"tools": "tools", END: END})
     g.add_conditional_edges("tools", _route_after_tools,
                             {"agent": "agent", "critic": "critic"})
     g.add_conditional_edges("critic", _route_after_critic,
-                            {"agent": "agent", END: END})
+                            {"agent": "agent", "adjudicate": "adjudicate"})
+    g.add_edge("adjudicate", END)
     return g.compile()
 
 

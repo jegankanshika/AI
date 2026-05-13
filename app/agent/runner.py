@@ -95,6 +95,7 @@ def _offline_decision(ctx: ToolContext) -> UnderwritingMemo:
 def run_offline(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTrace]:
     from app.agent.critic import review_memo
     from app.audit import audit_run, emit
+    from app.policy.gates import evaluate_hard_gates
 
     t0 = time.perf_counter()
     with audit_run(application.application_id):
@@ -105,6 +106,31 @@ def run_offline(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTr
         memo = _offline_decision(ctx)
         verdict = review_memo(memo, application)
         emit("critic", "critic.verdict", {"status": verdict.status, "issues": verdict.issues})
+
+        gates = evaluate_hard_gates(application, ctx.ratios)
+        emit("system", "hard_gates.evaluated", {
+            "backend": gates.backend, "passed": gates.passed,
+            "violations": [v.model_dump() for v in gates.violations],
+        })
+        if not gates.passed:
+            forced_codes = [v.code for v in gates.violations]
+            merged_codes = list(dict.fromkeys(memo.adverse_action_codes + forced_codes))
+            gate_lines = "\n".join(f"- [{v.code}] {v.reason}" for v in gates.violations)
+            memo = memo.model_copy(update={
+                "decision": "decline",
+                "adverse_action_codes": merged_codes,
+                "rationale": (
+                    f"Hard-gate override: decision forced to DECLINE.\n{gate_lines}\n\n"
+                    f"Original rationale: {memo.rationale}"
+                ),
+                "citations": memo.citations + [
+                    MemoCitation(source="engine:hard_gates", detail=v.reason)
+                    for v in gates.violations
+                ],
+            })
+            emit("system", "memo.overridden_by_gates", {
+                "violations": [v.model_dump() for v in gates.violations],
+            })
         emit("system", "memo.finalized", {"decision": memo.decision})
     trace = AgentTrace(
         tool_calls=[{"name": "compute_ratios"}, {"name": "lookup_policy"}, {"name": "score_pd"}],

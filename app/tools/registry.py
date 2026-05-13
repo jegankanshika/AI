@@ -9,6 +9,7 @@ import json
 from typing import Any, Callable
 
 from app.audit import emit
+from app.policy.gates import evaluate_hard_gates
 from app.schemas import LoanApplication
 from app.tools.policy import lookup_policy
 from app.tools.ratios import compute_ratios
@@ -65,6 +66,16 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "check_hard_gates",
+        "description": (
+            "Evaluate deterministic hard-decline rules (sanctions, age, "
+            "bankruptcies, delinquency count, DTI/LTV caps). Returns "
+            "`passed` and any `violations`. Call before submitting an "
+            "approval to make sure you are not contradicting a hard gate."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
         "name": "submit_memo",
         "description": (
             "Terminal action. Submit the final underwriting memo. "
@@ -107,6 +118,7 @@ class ToolContext:
         self.ratios = None  # type: ignore[assignment]
         self.risk = None    # type: ignore[assignment]
         self.policy_hits: list[dict] = []
+        self.gate_result = None  # type: ignore[assignment]
 
     def dispatch(self, name: str, args: dict) -> dict:
         emit("tool", f"tool_call.{name}.start", {"input": args})
@@ -124,6 +136,9 @@ class ToolContext:
                 else:
                     self.risk = score_pd(self.application, self.ratios)
                     result = json.loads(self.risk.model_dump_json())
+            elif name == "check_hard_gates":
+                self.gate_result = evaluate_hard_gates(self.application, self.ratios)
+                result = json.loads(self.gate_result.model_dump_json())
             else:
                 raise ValueError(f"unknown tool {name!r}")
         except Exception as e:
