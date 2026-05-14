@@ -69,6 +69,40 @@ class InMemorySink(AuditSink):
         self.events.append(event)
 
 
+class SqlAlchemySink(AuditSink):
+    """Persists events to any SQLAlchemy-supported DB. Use `DATABASE_URL` env
+    pointing at Postgres in production; SQLite works for development and tests.
+    Auto-initializes the schema on first use."""
+
+    def __init__(self, url_or_engine=None) -> None:
+        from app.audit_db import AuditEventRow, init_schema, make_engine, make_session_factory
+        if url_or_engine is None or isinstance(url_or_engine, str):
+            self._engine = make_engine(url_or_engine)
+        else:
+            self._engine = url_or_engine
+        init_schema(self._engine)
+        self._Session = make_session_factory(self._engine)
+        self._Row = AuditEventRow
+
+    def emit(self, event: AuditEvent) -> None:
+        # ts is persisted verbatim as the canonical ISO string so the hash
+        # chain survives the round trip.
+        row = self._Row(
+            id=event.id,
+            ts=event.ts,
+            run_id=event.run_id,
+            application_id=event.application_id,
+            actor=event.actor,
+            action=event.action,
+            payload=event.payload,
+            prev_hash=event.prev_hash,
+            hash=event.hash,
+        )
+        with self._Session() as s:
+            s.add(row)
+            s.commit()
+
+
 @contextlib.contextmanager
 def audit_run(
     application_id: str | None,
@@ -157,4 +191,13 @@ _current: contextvars.ContextVar[_AuditState | None] = contextvars.ContextVar(
 
 
 def _default_sink() -> AuditSink:
+    """Pick the production-style sink when DATABASE_URL is set, otherwise
+    fall back to the local JSONL file."""
+    if os.environ.get("DATABASE_URL"):
+        try:
+            return SqlAlchemySink()
+        except Exception:
+            # If the DB is unreachable, don't crash the run — log to JSONL
+            # and let the operator see the audit-log path in the warning.
+            pass
     return JsonlSink(os.environ.get("AUDIT_LOG_PATH", "audit.log"))

@@ -98,6 +98,57 @@ async def upload_document(
     )
 
 
+# ---- Audit query API -----------------------------------------------------
+
+
+@app.get("/audit/runs")
+def list_audit_runs(application_id: str | None = None, limit: int = 50) -> dict:
+    """List recent runs (optionally filtered by application_id) with their
+    decision (if finalized) and event count. Returns 503 if no DB sink is
+    configured (i.e., events are going to the local JSONL file)."""
+    from app.audit_db import list_runs, make_engine, make_session_factory
+
+    if not os.environ.get("DATABASE_URL"):
+        raise HTTPException(
+            status_code=503,
+            detail="audit DB not configured (set DATABASE_URL to enable /audit/*)",
+        )
+    engine = make_engine()
+    Session = make_session_factory(engine)
+    with Session() as s:
+        return {"runs": list_runs(s, application_id=application_id, limit=limit)}
+
+
+@app.get("/audit/runs/{run_id}")
+def get_audit_run(run_id: str) -> dict:
+    from app.audit import verify_chain, AuditEvent
+    from app.audit_db import get_run_events, make_engine, make_session_factory
+
+    if not os.environ.get("DATABASE_URL"):
+        raise HTTPException(
+            status_code=503,
+            detail="audit DB not configured (set DATABASE_URL to enable /audit/*)",
+        )
+    engine = make_engine()
+    Session = make_session_factory(engine)
+    with Session() as s:
+        rows = get_run_events(s, run_id)
+
+    events = [AuditEvent(
+        id=r.id, ts=r.ts,
+        run_id=r.run_id, application_id=r.application_id,
+        actor=r.actor, action=r.action, payload=r.payload or {},
+        prev_hash=r.prev_hash, hash=r.hash,
+    ) for r in rows]
+    if not events:
+        raise HTTPException(status_code=404, detail=f"run {run_id!r} not found")
+    return {
+        "run_id": run_id,
+        "chain_verified": verify_chain(events),
+        "events": [e.model_dump() for e in events],
+    }
+
+
 # ---- UI ------------------------------------------------------------------
 
 _UI_DIR = Path(__file__).resolve().parents[1] / "ui"

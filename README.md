@@ -53,6 +53,25 @@ Live mode (`run_agent(app, mode="live")`) uses `claude-opus-4-7` via the
 Anthropic SDK and requires `ANTHROPIC_API_KEY`. Offline mode uses a
 deterministic rule path so CI runs without secrets.
 
+### Persistent audit log (optional)
+
+By default audit events go to a local `audit.log` JSONL file with a tamper-
+evident SHA-256 chain. To persist to a real database, set `DATABASE_URL`:
+
+```bash
+# Postgres (prod)
+export DATABASE_URL=postgresql+psycopg://user:pw@host:5432/credit_copilot
+# SQLite (dev)
+export DATABASE_URL=sqlite:////absolute/path/to/audit.db
+
+python -m app.audit_cli init                       # create the audit_events table
+python -m app.audit_cli list --application-id ...  # recent runs + decision
+python -m app.audit_cli show <run_id>              # full event timeline + chain verify
+```
+
+When `DATABASE_URL` is set, the API also exposes `GET /audit/runs` and
+`GET /audit/runs/{run_id}` for the same data.
+
 ### CI
 
 - `.github/workflows/ci.yml` — runs `pytest -m "not live"` on every push and PR (Python 3.11 + 3.12 matrix).

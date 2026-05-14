@@ -16,5 +16,9 @@ faker==30.8.2
 numpy==2.1.3
 pandas==2.2.3
 
+# audit persistence (use psycopg-binary alongside this for Postgres)
+sqlalchemy>=2.0
+
 # test
 pytest>=9.0.0
+python-multipart>=0.0.20
