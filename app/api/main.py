@@ -5,18 +5,25 @@ Then open http://localhost:8000/
 """
 from __future__ import annotations
 
+import os
+import uuid
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.agent.runner import run_agent
+from app.idp.extractor import extract as extract_document
+from app.idp.schemas import DocumentRef, DocumentType
 from app.schemas import LoanApplication, UnderwritingMemo
 
-app = FastAPI(title="Credit Co-Pilot", version="0.2.0")
+UPLOADS_DIR = Path(os.environ.get("UPLOADS_DIR", "uploads")).resolve()
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+app = FastAPI(title="Credit Co-Pilot", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,7 +55,46 @@ def underwrite(application: LoanApplication) -> UnderwriteResponse:
             "latency_ms": trace.latency_ms,
             "revisions": trace.revisions,
             "critic_issues": trace.critic_issues,
+            "extractions": trace.extractions,
+            "income_verification": trace.income_verification,
         },
+    )
+
+
+class DocumentUploadResponse(BaseModel):
+    doc_id: str
+    doc_type: DocumentType
+    path: str
+    sha256: str | None
+    extraction: dict
+
+
+_ALLOWED_TYPES: tuple[DocumentType, ...] = ("paystub", "w2", "bank_statement", "photo_id")
+
+
+@app.post("/documents", response_model=DocumentUploadResponse)
+async def upload_document(
+    file: UploadFile = File(...),
+    doc_type: str = Form(...),
+) -> DocumentUploadResponse:
+    if doc_type not in _ALLOWED_TYPES:
+        raise HTTPException(status_code=422, detail=f"unsupported doc_type {doc_type!r}")
+    if not (file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(status_code=422, detail="only .pdf is supported in this slice")
+
+    doc_id = uuid.uuid4().hex[:12]
+    dest = UPLOADS_DIR / f"{doc_id}.pdf"
+    with dest.open("wb") as f:
+        f.write(await file.read())
+
+    ref = DocumentRef(doc_id=doc_id, doc_type=doc_type, path=str(dest))  # type: ignore[arg-type]
+    extraction = extract_document(ref)
+    return DocumentUploadResponse(
+        doc_id=doc_id,
+        doc_type=doc_type,  # type: ignore[arg-type]
+        path=str(dest),
+        sha256=extraction.fields.get("sha256"),
+        extraction=extraction.model_dump(),
     )
 
 

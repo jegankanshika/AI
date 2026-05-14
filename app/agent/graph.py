@@ -272,6 +272,7 @@ def run_live_graph(application: LoanApplication) -> tuple[UnderwritingMemo, dict
 
     if final.get("final_memo") is None:
         raise RuntimeError("agent terminated without submitting a memo")
+    final_ctx: ToolContext = final.get("ctx")  # type: ignore[assignment]
     trace = {
         "tool_calls": final.get("tool_calls", []),
         "tokens_in": final.get("tokens_in", 0),
@@ -281,5 +282,10 @@ def run_live_graph(application: LoanApplication) -> tuple[UnderwritingMemo, dict
         "revisions": final.get("revisions", 0),
         "critic_issues": final.get("critic_issues", []),
         "run_id": run_id,
+        "extractions": dict(final_ctx.extractions) if final_ctx else {},
+        "income_verification": (
+            final_ctx.income_verification.model_dump()
+            if final_ctx and final_ctx.income_verification else None
+        ),
     }
     return final["final_memo"], trace  # type: ignore[return-value]

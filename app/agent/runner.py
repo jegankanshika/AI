@@ -29,6 +29,8 @@ class AgentTrace:
     latency_ms: int = 0
     revisions: int = 0
     critic_issues: list[str] = field(default_factory=list)
+    extractions: dict[str, dict] = field(default_factory=dict)
+    income_verification: dict | None = None
 
 
 def _adverse_codes(app: LoanApplication, ratios: Ratios, risk: RiskScore) -> list[str]:
@@ -67,6 +69,12 @@ def _offline_decision(ctx: ToolContext) -> UnderwritingMemo:
     elif ratios.dti > 0.45:
         decision = "decline"
         rationale_bits.append(f"DTI {ratios.dti:.2f} exceeds PL-001 maximum 0.45.")
+    elif ctx.income_verification is not None and ctx.income_verification.material_gap:
+        decision = "refer_to_human"
+        rationale_bits.append(
+            f"Material income gap (max |Δ| {ctx.income_verification.max_abs_gap_pct:.1%}); "
+            f"refer for manual review."
+        )
     elif risk.pd > 0.5:
         decision = "refer_to_human"
         rationale_bits.append(f"PD {risk.pd:.2f} is elevated; refer for manual review.")
@@ -100,6 +108,17 @@ def run_offline(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTr
     t0 = time.perf_counter()
     with audit_run(application.application_id):
         ctx = ToolContext(application)
+        # Extract any attached documents and reconcile income before the
+        # usual deterministic pipeline so the UI can display them.
+        extraction_calls: list[dict] = []
+        for doc in application.documents:
+            ctx.dispatch("extract_document", {"doc_id": doc.doc_id})
+            extraction_calls.append({"name": "extract_document",
+                                     "input": {"doc_id": doc.doc_id}})
+        if application.documents:
+            ctx.dispatch("verify_income", {})
+            extraction_calls.append({"name": "verify_income", "input": {}})
+
         ctx.dispatch("compute_ratios", {})
         ctx.dispatch("lookup_policy", {"query": f"{application.product} eligibility"})
         ctx.dispatch("score_pd", {"dti": ctx.ratios.dti, "pti": ctx.ratios.pti})  # type: ignore[union-attr]
@@ -132,10 +151,17 @@ def run_offline(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTr
                 "violations": [v.model_dump() for v in gates.violations],
             })
         emit("system", "memo.finalized", {"decision": memo.decision})
+    base_calls = extraction_calls + [
+        {"name": "compute_ratios"}, {"name": "lookup_policy"}, {"name": "score_pd"},
+    ]
     trace = AgentTrace(
-        tool_calls=[{"name": "compute_ratios"}, {"name": "lookup_policy"}, {"name": "score_pd"}],
+        tool_calls=base_calls,
         latency_ms=int((time.perf_counter() - t0) * 1000),
         critic_issues=verdict.issues,
+        extractions=dict(ctx.extractions),
+        income_verification=(
+            ctx.income_verification.model_dump() if ctx.income_verification else None
+        ),
     )
     return memo, trace
 
@@ -152,6 +178,8 @@ def run_live(application: LoanApplication) -> tuple[UnderwritingMemo, AgentTrace
         latency_ms=trace_dict["latency_ms"],
         revisions=trace_dict.get("revisions", 0),
         critic_issues=trace_dict.get("critic_issues", []),
+        extractions=trace_dict.get("extractions", {}),
+        income_verification=trace_dict.get("income_verification"),
     )
 
 

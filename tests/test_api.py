@@ -1,6 +1,8 @@
 """FastAPI integration tests using the bundled test client."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from app.api.main import app
@@ -64,3 +66,57 @@ def test_underwrite_validates_input():
     bad["age"] = 10  # below schema min
     r = client.post("/underwrite", json=bad)
     assert r.status_code == 422
+
+
+def test_upload_document_paystub(paystub_pdf: Path):
+    with paystub_pdf.open("rb") as f:
+        r = client.post(
+            "/documents",
+            files={"file": ("paystub.pdf", f, "application/pdf")},
+            data={"doc_type": "paystub"},
+        )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["doc_type"] == "paystub"
+    assert body["sha256"]
+    assert body["extraction"]["fields"]["employer_name"] == "ACME CORP"
+
+
+def test_upload_document_rejects_unknown_type(paystub_pdf: Path):
+    with paystub_pdf.open("rb") as f:
+        r = client.post(
+            "/documents",
+            files={"file": ("paystub.pdf", f, "application/pdf")},
+            data={"doc_type": "selfie"},
+        )
+    assert r.status_code == 422
+
+
+def test_underwrite_with_documents_returns_extractions(paystub_pdf: Path):
+    payload = dict(_STRONG_APP)
+    payload["application_id"] = "api-with-doc"
+    payload["documents"] = [
+        {"doc_id": "p1", "doc_type": "paystub", "path": str(paystub_pdf)}
+    ]
+    r = client.post("/underwrite", json=payload)
+    assert r.status_code == 200, r.text
+    trace = r.json()["trace"]
+    assert "p1" in trace["extractions"]
+    assert trace["income_verification"] is not None
+    sources = {s["source"] for s in trace["income_verification"]["sources"]}
+    assert "paystub" in sources
+
+
+def test_material_income_gap_refers_to_human(paystub_pdf: Path):
+    # Strong profile states $110k income, but the fixture paystub annualizes
+    # to ~$90k -> 18% gap -> offline path should refer to human.
+    payload = dict(_STRONG_APP)
+    payload["application_id"] = "api-gap"
+    payload["documents"] = [
+        {"doc_id": "p1", "doc_type": "paystub", "path": str(paystub_pdf)}
+    ]
+    r = client.post("/underwrite", json=payload)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["memo"]["decision"] == "refer_to_human"
+    assert body["trace"]["income_verification"]["material_gap"] is True
