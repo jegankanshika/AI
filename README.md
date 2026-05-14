@@ -37,6 +37,18 @@ Open `http://localhost:8000/` for the underwriter UI: pick a preset
 **Underwrite** to see the rendered memo, ratios, PD breakdown, adverse-
 action codes, citations, and tool trace.
 
+### Sample PDFs to upload
+
+```bash
+python scripts/make_sample_pdfs.py            # writes samples/paystub.pdf, w2.pdf, bank_statement.pdf
+```
+
+In the UI, pick the document type from the dropdown, choose one of those
+files, click **Upload**, then **Underwrite**. Try uploading just the
+paystub against the **Strong profile** preset — the fixture annualizes to
+$90 k while the preset states $110 k, so the income-verification card
+flags a material gap and the decision moves to `refer_to_human`.
+
 Live mode (`run_agent(app, mode="live")`) uses `claude-opus-4-7` via the
 Anthropic SDK and requires `ANTHROPIC_API_KEY`. Offline mode uses a
 deterministic rule path so CI runs without secrets.
