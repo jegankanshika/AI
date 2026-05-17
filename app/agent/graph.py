@@ -1,0 +1,290 @@
+"""LangGraph orchestration for the live agent path.
+
+State machine:
+
+    START -> agent ─tool_use─▶ tools ─▶ agent ...
+                  └─end──▶ END
+
+`agent` node calls Claude with the running message list and the typed tool
+schemas. `tools` node executes the requested tools through the ToolContext
+dispatcher, appends results, and loops back. The terminal `submit_memo` tool
+is short-circuited so we never re-enter `agent` after submission.
+"""
+from __future__ import annotations
+
+import json
+import time
+from typing import Annotated, Any, TypedDict
+
+from langgraph.graph import END, START, StateGraph
+
+from app.agent.critic import review_memo
+from app.agent.prompts import SYSTEM_PROMPT
+from app.audit import audit_run, emit
+from app.llm import get_client, model_name
+from app.policy.gates import evaluate_hard_gates
+from app.schemas import LoanApplication, MemoCitation, UnderwritingMemo
+from app.tools.registry import TOOL_SCHEMAS, ToolContext
+
+MAX_TURNS = 8
+MAX_REVISIONS = 1
+
+
+def _append(left: list, right: list) -> list:
+    return (left or []) + (right or [])
+
+
+class AgentState(TypedDict, total=False):
+    application: LoanApplication
+    ctx: ToolContext
+    messages: Annotated[list[dict], _append]
+    tool_calls: Annotated[list[dict], _append]
+    tokens_in: int
+    tokens_out: int
+    turns: int
+    draft_memo: UnderwritingMemo | None
+    final_memo: UnderwritingMemo | None
+    revisions: int
+    critic_issues: Annotated[list[str], _append]
+    stop_reason: str
+    client: Any  # anthropic.Anthropic — typed loosely to keep the import lazy
+
+
+def _agent_node(state: AgentState) -> dict:
+    client = state["client"]
+    model = model_name()
+    emit("agent", "llm_call.start", {"model": model, "turn": state.get("turns", 0) + 1})
+    resp = client.messages.create(
+        model=model,
+        max_tokens=1500,
+        system=SYSTEM_PROMPT,
+        tools=TOOL_SCHEMAS,
+        messages=state["messages"],
+    )
+    emit("agent", "llm_call.result", {
+        "model": model,
+        "stop_reason": resp.stop_reason,
+        "tokens_in": resp.usage.input_tokens,
+        "tokens_out": resp.usage.output_tokens,
+    })
+    delta_msg = [{"role": "assistant", "content": resp.content}]
+    return {
+        "messages": delta_msg,
+        "tokens_in": state.get("tokens_in", 0) + resp.usage.input_tokens,
+        "tokens_out": state.get("tokens_out", 0) + resp.usage.output_tokens,
+        "turns": state.get("turns", 0) + 1,
+        "stop_reason": resp.stop_reason,
+    }
+
+
+def _tools_node(state: AgentState) -> dict:
+    ctx: ToolContext = state["ctx"]
+    last = state["messages"][-1]["content"]
+    tool_results: list[dict] = []
+    tool_calls_delta: list[dict] = []
+    draft_memo: UnderwritingMemo | None = None
+
+    for block in last:
+        if getattr(block, "type", None) != "tool_use":
+            continue
+        tool_calls_delta.append({"name": block.name, "input": block.input})
+
+        if block.name == "submit_memo":
+            draft_memo = UnderwritingMemo(
+                application_id=state["application"].application_id,
+                decision=block.input["decision"],
+                rationale=block.input["rationale"],
+                ratios=ctx.ratios,   # type: ignore[arg-type]
+                risk=ctx.risk,       # type: ignore[arg-type]
+                adverse_action_codes=block.input.get("adverse_action_codes", []),
+                citations=[MemoCitation(**c) for c in block.input.get("citations", [])],
+            )
+            emit("agent", "memo.draft_submitted", {
+                "decision": draft_memo.decision,
+                "adverse_action_codes": draft_memo.adverse_action_codes,
+                "n_citations": len(draft_memo.citations),
+            })
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": json.dumps({"status": "submitted, pending critic"}),
+            })
+            continue
+
+        try:
+            result = ctx.dispatch(block.name, block.input)
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": json.dumps(result),
+            })
+        except Exception as e:
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": json.dumps({"error": str(e)}),
+                "is_error": True,
+            })
+
+    return {
+        "messages": [{"role": "user", "content": tool_results}],
+        "tool_calls": tool_calls_delta,
+        "draft_memo": draft_memo,
+    }
+
+
+def _critic_node(state: AgentState) -> dict:
+    draft = state["draft_memo"]
+    assert draft is not None
+    verdict = review_memo(draft, state["application"], state.get("client"))
+    emit("critic", "critic.verdict", {
+        "status": verdict.status, "issues": verdict.issues,
+    })
+
+    if verdict.status == "pass":
+        return {"draft_memo": draft, "critic_issues": []}
+
+    revisions = state.get("revisions", 0)
+    if revisions >= MAX_REVISIONS:
+        return {"draft_memo": draft, "critic_issues": verdict.issues}
+
+    feedback = (
+        "The critic rejected the draft memo. Address these issues and call "
+        "`submit_memo` again:\n- " + "\n- ".join(verdict.issues)
+    )
+    if verdict.suggested_fix:
+        feedback += f"\n\nSuggested fix: {verdict.suggested_fix}"
+    return {
+        "messages": [{"role": "user", "content": feedback}],
+        "critic_issues": verdict.issues,
+        "revisions": revisions + 1,
+        "draft_memo": None,
+    }
+
+
+def _route_after_agent(state: AgentState) -> str:
+    if state.get("turns", 0) >= MAX_TURNS:
+        return END
+    if state.get("stop_reason") != "tool_use":
+        return END
+    return "tools"
+
+
+def _route_after_tools(state: AgentState) -> str:
+    if state.get("draft_memo") is not None:
+        return "critic"
+    return "agent"
+
+
+def _route_after_critic(state: AgentState) -> str:
+    # critic_node leaves draft_memo set when the draft is ready to be
+    # adjudicated (pass, or revisions exhausted); otherwise it cleared
+    # draft_memo and asked the agent to revise.
+    if state.get("draft_memo") is not None:
+        return "adjudicate"
+    return "agent"
+
+
+def _adjudicate_node(state: AgentState) -> dict:
+    """Final hard-gate adjudication. Overrides the draft if any gate fires.
+
+    This is the authoritative deterministic step: even if the agent and the
+    critic agree to approve, a hard-gate violation (sanctions, underage,
+    multiple bankruptcies, DTI > cap, LTV > cap, etc.) forces a decline
+    with the gate's reason codes appended to adverse_action_codes.
+    """
+    draft = state["draft_memo"]
+    assert draft is not None
+    ctx: ToolContext = state["ctx"]
+    gates = evaluate_hard_gates(state["application"], ctx.ratios)
+    emit("system", "hard_gates.evaluated", {
+        "backend": gates.backend,
+        "passed": gates.passed,
+        "violations": [v.model_dump() for v in gates.violations],
+    })
+
+    if gates.passed:
+        emit("system", "memo.finalized", {"decision": draft.decision})
+        return {"final_memo": draft}
+
+    forced_codes = [v.code for v in gates.violations]
+    merged_codes = list(dict.fromkeys(draft.adverse_action_codes + forced_codes))
+    gate_lines = "\n".join(f"- [{v.code}] {v.reason}" for v in gates.violations)
+    overridden = draft.model_copy(update={
+        "decision": "decline",
+        "adverse_action_codes": merged_codes,
+        "rationale": (
+            f"Hard-gate override: decision forced to DECLINE.\n{gate_lines}\n\n"
+            f"Original agent rationale: {draft.rationale}"
+        ),
+        "citations": draft.citations + [
+            MemoCitation(source="engine:hard_gates", detail=v.reason)
+            for v in gates.violations
+        ],
+    })
+    emit("system", "memo.overridden_by_gates", {
+        "original_decision": draft.decision,
+        "violations": [v.model_dump() for v in gates.violations],
+    })
+    emit("system", "memo.finalized", {"decision": overridden.decision})
+    return {"final_memo": overridden}
+
+
+def build_graph():
+    g = StateGraph(AgentState)
+    g.add_node("agent", _agent_node)
+    g.add_node("tools", _tools_node)
+    g.add_node("critic", _critic_node)
+    g.add_node("adjudicate", _adjudicate_node)
+    g.add_edge(START, "agent")
+    g.add_conditional_edges("agent", _route_after_agent, {"tools": "tools", END: END})
+    g.add_conditional_edges("tools", _route_after_tools,
+                            {"agent": "agent", "critic": "critic"})
+    g.add_conditional_edges("critic", _route_after_critic,
+                            {"agent": "agent", "adjudicate": "adjudicate"})
+    g.add_edge("adjudicate", END)
+    return g.compile()
+
+
+def run_live_graph(application: LoanApplication) -> tuple[UnderwritingMemo, dict]:
+    graph = build_graph()
+    init: AgentState = {
+        "application": application,
+        "ctx": ToolContext(application),
+        "messages": [{
+            "role": "user",
+            "content": (
+                "Underwrite this application.\n\n"
+                f"```json\n{application.model_dump_json(indent=2)}\n```"
+            ),
+        }],
+        "tool_calls": [],
+        "tokens_in": 0,
+        "tokens_out": 0,
+        "turns": 0,
+        "client": get_client(),
+    }
+    t0 = time.perf_counter()
+    with audit_run(application.application_id) as (run_id, _sink):
+        final: AgentState = graph.invoke(init, config={"recursion_limit": 2 * MAX_TURNS + 4})
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
+
+    if final.get("final_memo") is None:
+        raise RuntimeError("agent terminated without submitting a memo")
+    final_ctx: ToolContext = final.get("ctx")  # type: ignore[assignment]
+    trace = {
+        "tool_calls": final.get("tool_calls", []),
+        "tokens_in": final.get("tokens_in", 0),
+        "tokens_out": final.get("tokens_out", 0),
+        "latency_ms": elapsed_ms,
+        "turns": final.get("turns", 0),
+        "revisions": final.get("revisions", 0),
+        "critic_issues": final.get("critic_issues", []),
+        "run_id": run_id,
+        "extractions": dict(final_ctx.extractions) if final_ctx else {},
+        "income_verification": (
+            final_ctx.income_verification.model_dump()
+            if final_ctx and final_ctx.income_verification else None
+        ),
+    }
+    return final["final_memo"], trace  # type: ignore[return-value]
