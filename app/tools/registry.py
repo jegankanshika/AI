@@ -1,4 +1,4 @@
-"""Anthropic tool-use schemas + dispatcher for the agent.
+"""Tool-use schemas + dispatcher for the agent.
 
 Each entry is a JSON Schema the LLM sees, plus a Python handler that consumes
 the validated input and returns a JSON-serializable result.

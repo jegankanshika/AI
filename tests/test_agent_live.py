@@ -1,8 +1,8 @@
-"""End-to-end live test against the real Anthropic API.
+"""End-to-end live test against a real Ollama server.
 
-Skipped unless `ANTHROPIC_API_KEY` is set in the environment, so local
-contributors and the default CI run don't pay tokens. The dedicated
-`live-tests.yml` workflow runs this on demand.
+Skipped unless `OLLAMA_HOST` is set in the environment, so local
+contributors and the default CI run don't need a model loaded. The
+dedicated `live-tests.yml` workflow runs this on demand.
 
 What we assert (without pinning the LLM's exact wording):
   * The agent completes a full run without raising.
@@ -24,8 +24,8 @@ from app.schemas import BureauData, LoanApplication
 pytestmark = [
     pytest.mark.live,
     pytest.mark.skipif(
-        not os.environ.get("ANTHROPIC_API_KEY"),
-        reason="ANTHROPIC_API_KEY not set — live test skipped",
+        not os.environ.get("OLLAMA_HOST"),
+        reason="OLLAMA_HOST not set — live test skipped",
     ),
 ]
 

@@ -49,25 +49,23 @@ paystub against the **Strong profile** preset — the fixture annualizes to
 $90 k while the preset states $110 k, so the income-verification card
 flags a material gap and the decision moves to `refer_to_human`.
 
-Live mode (`run_agent(app, mode="live")`) uses `claude-opus-4-7` via the
-Anthropic SDK and requires `ANTHROPIC_API_KEY`. Offline mode uses a
-deterministic rule path so CI runs without secrets.
+### Live LLM (Ollama)
 
-### LLM providers
-
-The live agent path defaults to the Anthropic SDK. To run against a local
-[Ollama](https://ollama.com) server instead:
+The live agent path talks to a local [Ollama](https://ollama.com) server.
+Offline mode uses a deterministic rule path so CI runs without any model.
 
 ```bash
-export LLM_PROVIDER=ollama
-export LLM_MODEL=llama3.1            # or any tool-calling model you've pulled
-export LLM_CRITIC_MODEL=llama3.2:3b  # optional, smaller model for the critic
+ollama serve &
+ollama pull llama3.1
 export OLLAMA_HOST=http://localhost:11434
+export LLM_MODEL=llama3.1            # default
+export LLM_CRITIC_MODEL=llama3.2:3b  # optional, smaller model for the critic
 ```
 
-The provider is selected by env at startup; no code changes are needed. The
-graph and critic talk to a thin shim (`app/llm/ollama.py`) that translates
-between the Anthropic message/tool format and Ollama's `/api/chat` API.
+With `OLLAMA_HOST` set, `run_agent(app)` auto-picks the live path; without
+it, auto mode stays on the offline deterministic path. The graph and
+critic talk to a thin shim (`app/llm/ollama.py`) that bridges to Ollama's
+`/api/chat` endpoint.
 
 Note: the model must support tool calling (Llama 3.1, Qwen 2.5, Mistral
 Small, etc.). Models without tool-call support will reply with text-only
@@ -95,7 +93,7 @@ When `DATABASE_URL` is set, the API also exposes `GET /audit/runs` and
 ### CI
 
 - `.github/workflows/ci.yml` — runs `pytest -m "not live"` on every push and PR (Python 3.11 + 3.12 matrix).
-- `.github/workflows/live-tests.yml` — manual `workflow_dispatch` trigger that runs the live integration tests with `secrets.ANTHROPIC_API_KEY`. Enable the nightly cron once a token budget alert is in place.
+- `.github/workflows/live-tests.yml` — manual `workflow_dispatch` trigger that runs the live integration tests against an Ollama runner; the workflow sets `OLLAMA_HOST` after the model is pulled. Enable the nightly cron once a runtime budget is in place.
 
 ---
 

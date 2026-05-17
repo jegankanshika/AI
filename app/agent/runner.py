@@ -8,7 +8,6 @@ need an API key.
 from __future__ import annotations
 
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from typing import Literal

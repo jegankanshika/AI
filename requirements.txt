@@ -1,6 +1,5 @@
 # pinned to versions verified during initial build (May 2026)
-# agent runtime
-anthropic>=0.101.0
+# agent runtime (Ollama is talked to over plain HTTP — no SDK needed)
 langgraph>=1.2.0
 fastapi>=0.136.0
 uvicorn>=0.46.0

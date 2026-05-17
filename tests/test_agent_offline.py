@@ -1,4 +1,4 @@
-"""Agent offline path tests — no Anthropic API key required."""
+"""Agent offline path tests — no live LLM required."""
 from __future__ import annotations
 
 from app.agent.runner import run_agent

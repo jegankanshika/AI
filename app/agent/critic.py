@@ -1,4 +1,4 @@
-"""Critic — a small Haiku pass that reviews the draft memo before submit.
+"""Critic — a small LLM pass that reviews the draft memo before submit.
 
 Checks:
   * decision is consistent with the computed ratios / PD / hard-decline rules,
@@ -8,7 +8,7 @@ Checks:
 
 Returns a verdict: `pass` -> promote draft to final; `revise` -> bounce back
 to the agent with a structured critique. Offline mode runs a deterministic
-rule-based critic so tests run without an API key.
+rule-based critic so tests run without an LLM available.
 """
 from __future__ import annotations
 
@@ -111,8 +111,8 @@ def _live_critic(memo: UnderwritingMemo,
 def review_memo(memo: UnderwritingMemo,
                 application: LoanApplication,
                 client=None) -> CriticVerdict:
-    """Always runs the deterministic offline checks; additionally calls Haiku
-    in live mode and merges its issues."""
+    """Always runs the deterministic offline checks; additionally calls the
+    configured LLM critic when one is available and merges its issues."""
     verdict = _offline_critic(memo)
 
     if client is None or not have_credentials():

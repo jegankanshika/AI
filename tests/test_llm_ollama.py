@@ -1,13 +1,12 @@
 """OllamaClient shim — translation tests.
 
 Mocks `urllib.request.urlopen` so no Ollama server is needed. Verifies:
-  * tools translation (Anthropic input_schema -> OpenAI function.parameters),
+  * tools translation (graph's input_schema -> OpenAI function.parameters),
   * outgoing message translation: assistant tool_use -> tool_calls;
     user tool_result -> role:tool with tool_call_id,
   * response translation: Ollama tool_calls -> Block(type='tool_use', ...),
   * stop_reason mapping ('tool_use' vs 'end_turn'),
-  * factory: LLM_PROVIDER=ollama returns OllamaClient, default returns
-    the Anthropic SDK client.
+  * factory + env helpers.
 """
 from __future__ import annotations
 
@@ -55,7 +54,7 @@ def test_tools_translation():
 
 
 def test_messages_translation_assistant_tool_use_and_user_tool_result():
-    # Mimic an Anthropic-style assistant block list (using duck-typed objects).
+    # Mimic the assistant block list the graph keeps in state.
     class _B:
         def __init__(self, **kw): self.__dict__.update(kw)
 
@@ -135,23 +134,24 @@ def test_create_text_only_returns_end_turn():
     assert resp.content[0].text == "hello there"
 
 
-def test_factory_picks_ollama_when_env_set(monkeypatch):
-    from app.llm import get_client, have_credentials, model_name, critic_model_name, provider
-    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+def test_factory_returns_ollama_client(monkeypatch):
+    from app.llm import critic_model_name, get_client, have_credentials, model_name
+    monkeypatch.setenv("OLLAMA_HOST", "http://localhost:11434")
     monkeypatch.setenv("LLM_MODEL", "llama3.1")
     monkeypatch.setenv("LLM_CRITIC_MODEL", "llama3.2:3b")
 
-    assert provider() == "ollama"
     assert have_credentials() is True
     assert model_name() == "llama3.1"
     assert critic_model_name() == "llama3.2:3b"
     assert isinstance(get_client(), OllamaClient)
 
 
-def test_factory_default_is_anthropic(monkeypatch):
-    from app.llm import have_credentials, model_name, provider
-    monkeypatch.delenv("LLM_PROVIDER", raising=False)
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    assert provider() == "anthropic"
+def test_have_credentials_false_without_ollama_host(monkeypatch):
+    from app.llm import critic_model_name, have_credentials, model_name
+    monkeypatch.delenv("OLLAMA_HOST", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("LLM_CRITIC_MODEL", raising=False)
     assert have_credentials() is False
-    assert model_name() == "claude-opus-4-7"
+    # Defaults are stable regardless of env.
+    assert model_name() == "llama3.1"
+    assert critic_model_name() == "llama3.1"

@@ -1,4 +1,4 @@
-"""Ollama client shim that mimics the slice of `anthropic.Anthropic` we use.
+"""Ollama client shim with the small API surface the agent graph uses.
 
 Surface:
     client.messages.create(model=..., max_tokens=..., system=..., tools=..., messages=...)
@@ -7,7 +7,9 @@ Surface:
          .usage         object with .input_tokens, .output_tokens
          .stop_reason   "tool_use" | "end_turn"
 
-Translation rules (Anthropic <-> OpenAI/Ollama):
+The graph and critic were originally built against the Anthropic
+message/tool format, so this shim translates that format to and from
+Ollama's OpenAI-compatible `/api/chat` shape:
 
   Tools:
     {name, description, input_schema}

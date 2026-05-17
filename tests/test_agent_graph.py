@@ -1,7 +1,7 @@
-"""LangGraph live-path test using a fake Anthropic client.
+"""LangGraph live-path test using a fake LLM client.
 
-Exercises the agent + tools nodes and the routing edges without hitting the
-real API. Confirms tool dispatch, accumulated trace, and terminal submit_memo.
+Exercises the agent + tools nodes and the routing edges without hitting a
+real model. Confirms tool dispatch, accumulated trace, and terminal submit_memo.
 """
 from __future__ import annotations
 

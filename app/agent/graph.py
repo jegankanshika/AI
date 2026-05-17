@@ -5,10 +5,11 @@ State machine:
     START -> agent ─tool_use─▶ tools ─▶ agent ...
                   └─end──▶ END
 
-`agent` node calls Claude with the running message list and the typed tool
-schemas. `tools` node executes the requested tools through the ToolContext
-dispatcher, appends results, and loops back. The terminal `submit_memo` tool
-is short-circuited so we never re-enter `agent` after submission.
+`agent` node calls the configured LLM (Ollama by default; see `app.llm`)
+with the running message list and the typed tool schemas. `tools` node
+executes the requested tools through the ToolContext dispatcher, appends
+results, and loops back. The terminal `submit_memo` tool is short-circuited
+so we never re-enter `agent` after submission.
 """
 from __future__ import annotations
 
@@ -47,7 +48,7 @@ class AgentState(TypedDict, total=False):
     revisions: int
     critic_issues: Annotated[list[str], _append]
     stop_reason: str
-    client: Any  # anthropic.Anthropic — typed loosely to keep the import lazy
+    client: Any  # app.llm.ollama.OllamaClient — typed loosely to keep the import lazy
 
 
 def _agent_node(state: AgentState) -> dict:
