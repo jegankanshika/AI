@@ -187,7 +187,8 @@ def run_agent(application: LoanApplication,
               mode: Literal["live", "offline", "auto"] = "auto"
               ) -> tuple[UnderwritingMemo, AgentTrace]:
     if mode == "auto":
-        mode = "live" if os.environ.get("ANTHROPIC_API_KEY") else "offline"
+        from app.llm import have_credentials
+        mode = "live" if have_credentials() else "offline"
     if mode == "offline":
         return run_offline(application)
     return run_live(application)

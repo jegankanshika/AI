@@ -13,14 +13,12 @@ rule-based critic so tests run without an API key.
 from __future__ import annotations
 
 import json
-import os
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.llm import critic_model_name, have_credentials
 from app.schemas import LoanApplication, UnderwritingMemo
-
-CRITIC_MODEL = "claude-haiku-4-5"
 
 PROTECTED_TERMS = (
     "race", "ethnic", "gender", " sex ", "marital", "religion",
@@ -92,7 +90,7 @@ def _live_critic(memo: UnderwritingMemo,
         "draft_memo": json.loads(memo.model_dump_json()),
     }
     resp = client.messages.create(
-        model=CRITIC_MODEL,
+        model=critic_model_name(),
         max_tokens=400,
         system=CRITIC_SYSTEM,
         messages=[{"role": "user", "content": json.dumps(payload)}],
@@ -117,8 +115,7 @@ def review_memo(memo: UnderwritingMemo,
     in live mode and merges its issues."""
     verdict = _offline_critic(memo)
 
-    use_live = client is not None and os.environ.get("ANTHROPIC_API_KEY")
-    if not use_live:
+    if client is None or not have_credentials():
         return verdict
 
     live = _live_critic(memo, application, client)

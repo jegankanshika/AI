@@ -53,6 +53,26 @@ Live mode (`run_agent(app, mode="live")`) uses `claude-opus-4-7` via the
 Anthropic SDK and requires `ANTHROPIC_API_KEY`. Offline mode uses a
 deterministic rule path so CI runs without secrets.
 
+### LLM providers
+
+The live agent path defaults to the Anthropic SDK. To run against a local
+[Ollama](https://ollama.com) server instead:
+
+```bash
+export LLM_PROVIDER=ollama
+export LLM_MODEL=llama3.1            # or any tool-calling model you've pulled
+export LLM_CRITIC_MODEL=llama3.2:3b  # optional, smaller model for the critic
+export OLLAMA_HOST=http://localhost:11434
+```
+
+The provider is selected by env at startup; no code changes are needed. The
+graph and critic talk to a thin shim (`app/llm/ollama.py`) that translates
+between the Anthropic message/tool format and Ollama's `/api/chat` API.
+
+Note: the model must support tool calling (Llama 3.1, Qwen 2.5, Mistral
+Small, etc.). Models without tool-call support will reply with text-only
+turns and the agent will terminate without submitting a memo.
+
 ### Persistent audit log (optional)
 
 By default audit events go to a local `audit.log` JSONL file with a tamper-

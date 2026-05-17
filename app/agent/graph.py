@@ -21,11 +21,11 @@ from langgraph.graph import END, START, StateGraph
 from app.agent.critic import review_memo
 from app.agent.prompts import SYSTEM_PROMPT
 from app.audit import audit_run, emit
+from app.llm import get_client, model_name
 from app.policy.gates import evaluate_hard_gates
 from app.schemas import LoanApplication, MemoCitation, UnderwritingMemo
 from app.tools.registry import TOOL_SCHEMAS, ToolContext
 
-MODEL = "claude-opus-4-7"
 MAX_TURNS = 8
 MAX_REVISIONS = 1
 
@@ -52,16 +52,17 @@ class AgentState(TypedDict, total=False):
 
 def _agent_node(state: AgentState) -> dict:
     client = state["client"]
-    emit("agent", "llm_call.start", {"model": MODEL, "turn": state.get("turns", 0) + 1})
+    model = model_name()
+    emit("agent", "llm_call.start", {"model": model, "turn": state.get("turns", 0) + 1})
     resp = client.messages.create(
-        model=MODEL,
+        model=model,
         max_tokens=1500,
         system=SYSTEM_PROMPT,
         tools=TOOL_SCHEMAS,
         messages=state["messages"],
     )
     emit("agent", "llm_call.result", {
-        "model": MODEL,
+        "model": model,
         "stop_reason": resp.stop_reason,
         "tokens_in": resp.usage.input_tokens,
         "tokens_out": resp.usage.output_tokens,
@@ -246,8 +247,6 @@ def build_graph():
 
 
 def run_live_graph(application: LoanApplication) -> tuple[UnderwritingMemo, dict]:
-    import anthropic
-
     graph = build_graph()
     init: AgentState = {
         "application": application,
@@ -263,7 +262,7 @@ def run_live_graph(application: LoanApplication) -> tuple[UnderwritingMemo, dict
         "tokens_in": 0,
         "tokens_out": 0,
         "turns": 0,
-        "client": anthropic.Anthropic(),
+        "client": get_client(),
     }
     t0 = time.perf_counter()
     with audit_run(application.application_id) as (run_id, _sink):
