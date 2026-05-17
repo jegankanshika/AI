@@ -1,0 +1,42 @@
+{
+  "as_of": "2024-12-31",
+  "method": "Bass diffusion fit on TN VAHAN data 2020-24 with FAME-II / TN EV Policy 2023 / PM-eDrive policy uplifts.",
+  "tn_ev_stock_forecast": [
+    {"year": 2024, "two_wheeler": 251030, "three_wheeler": 35000, "four_wheeler": 29000, "bus_truck": 6540, "total": 321570},
+    {"year": 2025, "two_wheeler": 380000, "three_wheeler": 52000, "four_wheeler": 46000, "bus_truck": 9200,  "total": 487200},
+    {"year": 2026, "two_wheeler": 580000, "three_wheeler": 78000, "four_wheeler": 76000, "bus_truck": 15000, "total": 749000},
+    {"year": 2027, "two_wheeler": 845000, "three_wheeler":110000, "four_wheeler":120000, "bus_truck": 23500, "total": 1098500},
+    {"year": 2028, "two_wheeler":1180000, "three_wheeler":148000, "four_wheeler":180000, "bus_truck": 34000, "total": 1542000},
+    {"year": 2029, "two_wheeler":1580000, "three_wheeler":192000, "four_wheeler":256000, "bus_truck": 47500, "total": 2075500},
+    {"year": 2030, "two_wheeler":2050000, "three_wheeler":238000, "four_wheeler":352000, "bus_truck": 63000, "total": 2703000}
+  ],
+  "public_charging_demand_forecast": [
+    {"year": 2025, "public_chargers_needed": 6800,  "highway_dc_needed": 320,  "city_dc_needed": 1480, "city_ac_needed": 5000},
+    {"year": 2026, "public_chargers_needed": 10600, "highway_dc_needed": 520,  "city_dc_needed": 2580, "city_ac_needed": 7500},
+    {"year": 2027, "public_chargers_needed": 15500, "highway_dc_needed": 780,  "city_dc_needed": 4120, "city_ac_needed":10600},
+    {"year": 2028, "public_chargers_needed": 21800, "highway_dc_needed": 1080, "city_dc_needed": 5820, "city_ac_needed":14900},
+    {"year": 2029, "public_chargers_needed": 29200, "highway_dc_needed": 1420, "city_dc_needed": 7920, "city_ac_needed":19860},
+    {"year": 2030, "public_chargers_needed": 38000, "highway_dc_needed": 1800, "city_dc_needed":10200, "city_ac_needed":26000}
+  ],
+  "industry_revenue_forecast_tn_inr_cr": [
+    {"year": 2025, "revenue_cr": 320, "capex_cr": 1100, "addressable_operators": 35},
+    {"year": 2026, "revenue_cr": 580, "capex_cr": 1850, "addressable_operators": 55},
+    {"year": 2027, "revenue_cr": 1020, "capex_cr": 2800, "addressable_operators": 80},
+    {"year": 2028, "revenue_cr": 1680, "capex_cr": 3900, "addressable_operators": 105},
+    {"year": 2029, "revenue_cr": 2520, "capex_cr": 5100, "addressable_operators": 130},
+    {"year": 2030, "revenue_cr": 3650, "capex_cr": 6400, "addressable_operators": 155}
+  ],
+  "key_drivers": [
+    "TN EV Policy 2023 — 50% capital subsidy on first 5000 stations, full SGST refund 5 yrs.",
+    "PM-eDrive — INR 10900 cr central scheme through 2026 incl. highway DC subsidy.",
+    "FAME-III (anticipated FY26) — likely deeper CapEx subsidy + demand incentive on e-4W.",
+    "TANGEDCO tariff rationalisation — separate EV charging tariff INR 6-7 / kWh HT.",
+    "e-CV mandates — last-mile delivery cos with >50 vehicles must be 30% EV by FY27."
+  ],
+  "risks": [
+    "Charger oversupply in saturated corridors (OMR, ECR) -> sub-10% utilization for new entrants.",
+    "Battery technology shift (LFP -> sodium-ion) compresses ROI window on present-gen chargers.",
+    "Grid upgrade lag in Tier-2 cities throttles deployment despite demand.",
+    "Tariff cap by TNERC could squeeze margins."
+  ]
+}
