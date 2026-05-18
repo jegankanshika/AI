@@ -33,7 +33,7 @@ def classify(q: str, district: str | None = None) -> str:
         w in s for w in ["new location", "where to start", "site selection", "siting", "expansion plan", "best location", "next station"]
     ):
         return "future_locations"
-    if any(w in s for w in ["partner", "contact", "vendor", "tata power", "ather", "hpcl", "iocl", "bpcl", "tangedco", "site host"]):
+    if any(w in s for w in ["partner", "contact", "vendor", "tata power", "ather", "hpcl", "iocl", "bpcl", "tangedco", "site host", "it park", "tech park", "sez", "tidel"]):
         return "partners"
     if any(w in s for w in ["setup", "capex", "opex", "lowest cost", "cheap", "franchise", "setup plan", "build a station"]):
         return "setup_plan"
@@ -109,7 +109,9 @@ def run(query: Query) -> AgentResponse:
     elif intent == "partners":
         cat = None
         s = query.question.lower()
-        if "fuel" in s or "hpcl" in s or "iocl" in s or "bpcl" in s:
+        if "it park" in s or "tech park" in s or "sez" in s or "tidel" in s:
+            cat = "it park"
+        elif "fuel" in s or "hpcl" in s or "iocl" in s or "bpcl" in s:
             cat = "fuel retail"
         elif "mall" in s or "retail" in s:
             cat = "malls and retail"

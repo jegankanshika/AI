@@ -4,13 +4,19 @@ from __future__ import annotations
 from app_ev.tools.data_loader import stations
 
 
-def list_stations(district: str | None = None, highway_only: bool = False) -> dict:
+def list_stations(
+    district: str | None = None,
+    highway_only: bool = False,
+    site_class: str | None = None,
+) -> dict:
     data = stations()
     rows = data["stations"]
     if district:
         rows = [s for s in rows if s["district"].lower() == district.lower()]
     if highway_only:
         rows = [s for s in rows if s.get("highway")]
+    if site_class:
+        rows = [s for s in rows if s.get("site_class") == site_class]
     return {
         "as_of": data["as_of"],
         "source": data["source"],

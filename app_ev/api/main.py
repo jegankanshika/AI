@@ -94,8 +94,14 @@ def registrations_summary() -> dict:
 
 
 @app.get("/stations")
-def stations_endpoint(district: str | None = None, highway_only: bool = False) -> dict:
-    return stations.list_stations(district=district, highway_only=highway_only)
+def stations_endpoint(
+    district: str | None = None,
+    highway_only: bool = False,
+    site_class: str | None = None,
+) -> dict:
+    return stations.list_stations(
+        district=district, highway_only=highway_only, site_class=site_class
+    )
 
 
 @app.get("/stations/{station_id}")
