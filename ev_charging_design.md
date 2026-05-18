@@ -23,6 +23,10 @@ JSON tools and a single-page browser UI.
 | 6 | Site/host contact details + how to proceed (playbook) | `app_ev/data/partners_contacts.json` + UI **Partners & Contacts** tab + `GET /partners` |
 | 7 | Lowest-cost individual setup vs partner-vendor setup | `app_ev/data/setup_plans.json` + UI **Setup Plans** tab + `GET /setup` |
 | 8 | Future growth predictions (TN EV stock, charging demand, revenue) | `app_ev/data/growth_forecast.json` + UI **Growth Forecast** tab + `GET /forecast` |
+| 9 | All available charger kW types + benefits + best usage timing | `app_ev/data/charger_types.json` + UI **Charger Types** tab + `GET /charger-types` |
+| 10 | Customize setup plan by picking chargers/kW; see cost & payback | `tools/charger_catalog.custom_setup()` + UI **Charger Calculator** tab + `POST /setup/custom` |
+| 11 | Most-effective charger ranking (ROI-based) | `tools/charger_catalog.effectiveness_ranking()` + UI **Charger Calculator** tab + `GET /setup/effective` |
+| 12 | Daily live-data refresh from upstream feeds | `app_ev/refresh.py` + in-process daily scheduler (lifespan task) + `POST /refresh` (manual trigger) |
 
 The natural-language interface is `POST /ask` (UI **Ask the Agent** tab) — it
 classifies intent, calls the right tool(s), and returns the structured payload
@@ -77,6 +81,53 @@ plus a one-line summary.
 | `intelligence.list_partners(category?)` | filter | Site hosts, OEMs, discom, fleet anchors |
 | `intelligence.setup_plan(mode)` | `solo\|partner\|all` | Bill of materials, OpEx, payback |
 | `intelligence.growth_forecast()` | — | Stock / charger demand / revenue to 2030 |
+| `charger_catalog.list_chargers(current_type?)` | `AC \| DC \| DC Fast \| DC Ultra-Fast` | Full kW catalog with benefits + timing |
+| `charger_catalog.custom_setup(selections, utilization_pct, site_class)` | mix + scenario | CapEx breakdown, OpEx, monthly revenue, payback |
+| `charger_catalog.effectiveness_ranking(site_class, utilization_pct)` | scenario | All chargers ranked by annual ROI; the `most_effective` highlighted |
+| `refresh.refresh_all()` | — | Pulls upstream JSON feeds, atomic-writes data files |
+
+### Charger types catalog (`app_ev/data/charger_types.json`)
+
+12 charger SKUs across AC (3.3 / 7.4 / 11 / 22 kW), DC (15 GB/T, 30 / 60 CCS2, 50 CHAdeMO) and DC Fast / Ultra-Fast (120 / 180 / 240 / 350 kW CCS2). Each entry carries:
+
+- electrical spec (voltage / amps / connector / OCPP version),
+- per-session profile (hours, kWh),
+- equipment CapEx (single unit),
+- target vehicle classes (e-2W / e-3W / e-4W / e-LCV / e-HCV / e-bus),
+- best-use narrative,
+- benefits (3-5 bullets),
+- best usage timing window,
+- limitations.
+
+### Setup calculator (`tools/charger_catalog.custom_setup`)
+
+Inputs:
+
+```jsonc
+{
+  "selections": [{"id": "DC-120-CCS2", "count": 2}, {"id": "AC-22-TYPE2", "count": 4}],
+  "utilization_pct": 100,           // scales sessions/day vs the per-class default
+  "site_class": "city"              // "city" | "highway" | "depot"
+}
+```
+
+The calculator:
+
+1. Sums equipment CapEx across selections.
+2. Adds derived costs: civil (₹70k/bay), panel + cabling (18 % of equipment), transformer share (₹800/kW total), CSMS setup, signage/IoT/CCTV, permits + project mgmt (5 %), contingency (8 %).
+3. Computes monthly OpEx: rent (scaled by `site_class`), demand charge (₹80/kW), CSMS subscription, insurance, marketing, technician share.
+4. Computes monthly revenue: tariff varies by charger class (AC ₹14, DC slow ₹19, DC Fast ₹23, DC Ultra ₹27/kWh — `+₹2` on highway, `-₹3` on depot); sessions/day adjusted by `utilization_pct` and `site_class`.
+5. Returns CapEx total, monthly gross margin, payback months, annual kWh delivered, plus the applicable subsidy stack.
+
+### Daily data refresh (`app_ev/refresh.py`)
+
+Refreshes the bundled JSON files from configured upstream URLs (`VAHAN_TN_URL`, `BEE_PCS_URL`, `CHALLENGES_FEED_URL`, `FORECAST_URL`). Three ways to run it:
+
+1. **In-process daily scheduler** — `app_ev/api/main.py` registers a lifespan task that calls `refresh_all()` every 24 h while the FastAPI service is up.
+2. **Cron** — `0 3 * * * cd /srv/ai && python -m app_ev.refresh >> /var/log/ev_refresh.log 2>&1`.
+3. **Manual trigger** — `POST /refresh` runs the refresh on demand and returns a status report.
+
+When an upstream env var is unset, that source is **skipped** (bundled snapshot retained) so dev/CI never breaks. Atomic file writes ensure partial failures don't leave corrupted data.
 
 ### Agent runner
 
@@ -141,6 +192,11 @@ GET  /future?scope=chennai|highway&top_n=N
 GET  /partners                 -> all partner categories (category? filter)
 GET  /setup?mode=solo|partner|all
 GET  /forecast                 -> TN EV stock / charging / revenue forecast
+GET  /charger-types            -> all charger SKUs (filter: ?current_type=AC|DC|DC Fast|DC Ultra-Fast)
+GET  /charger-types/{id}       -> one charger detail
+POST /setup/custom             -> body: {selections, utilization_pct, site_class}; returns CapEx + payback
+GET  /setup/effective          -> ranking by annual ROI; ?site_class=&utilization_pct=
+POST /refresh                  -> trigger immediate refresh from configured upstream feeds
 ```
 
 ---

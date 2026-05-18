@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app_ev.agent.runner import run
 from app_ev.api.main import app
 from app_ev.schemas import Query
-from app_ev.tools import intelligence, registrations, stations
+from app_ev.tools import charger_catalog, intelligence, registrations, stations
 
 client = TestClient(app)
 
@@ -100,6 +100,69 @@ def test_api_stations_highway_only():
     assert r.status_code == 200
     j = r.json()
     assert all(s["highway"] for s in j["stations"])
+
+
+def test_charger_catalog_has_all_classes():
+    d = charger_catalog.list_chargers()
+    assert d["count"] >= 10
+    classes = {c["current_type"] for c in d["chargers"]}
+    assert "AC" in classes and "DC Fast" in classes and "DC Ultra-Fast" in classes
+    for c in d["chargers"]:
+        assert c["best_usage_timing"]
+        assert len(c["benefits"]) >= 1
+
+
+def test_custom_setup_solo_dc60():
+    out = charger_catalog.custom_setup([{"id": "DC-60-CCS2", "count": 1}])
+    t = out["totals"]
+    assert t["bays"] == 1 and t["installed_kw"] == 60
+    assert t["capex_total_inr"] > t["equipment_capex_inr"]
+    assert t["monthly_revenue_inr"] > 0
+
+
+def test_custom_setup_mixed_highway():
+    out = charger_catalog.custom_setup(
+        [{"id": "DC-240-CCS2", "count": 2}, {"id": "DC-120-CCS2", "count": 2}],
+        site_class="highway",
+    )
+    t = out["totals"]
+    assert t["bays"] == 4 and t["installed_kw"] == 720
+    assert t["payback_months"] is None or t["payback_months"] > 0
+
+
+def test_effectiveness_ranking_returns_most_effective():
+    r = charger_catalog.effectiveness_ranking()
+    assert "most_effective" in r and r["most_effective"]["annual_roi_pct"] is not None
+    assert r["ranking"][0]["id"] == r["most_effective"]["id"]
+
+
+def test_api_charger_types():
+    r = client.get("/charger-types")
+    assert r.status_code == 200 and r.json()["count"] >= 10
+
+
+def test_api_setup_custom():
+    r = client.post(
+        "/setup/custom",
+        json={"selections": [{"id": "AC-22-TYPE2", "count": 4}], "site_class": "city"},
+    )
+    assert r.status_code == 200
+    assert r.json()["totals"]["bays"] == 4
+
+
+def test_api_setup_effective():
+    r = client.get("/setup/effective", params={"site_class": "highway"})
+    assert r.status_code == 200
+    assert r.json()["most_effective"]["label"]
+
+
+def test_refresh_skips_when_envs_unset(monkeypatch):
+    for v in ["VAHAN_TN_URL", "BEE_PCS_URL", "CHALLENGES_FEED_URL", "FORECAST_URL"]:
+        monkeypatch.delenv(v, raising=False)
+    from app_ev import refresh
+    out = refresh.refresh_all()
+    assert out["errors"] == 0
+    assert all(r["status"] == "skipped" for r in out["results"])
 
 
 def test_api_ask_summary():

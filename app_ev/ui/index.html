@@ -71,6 +71,8 @@
   <button data-view="partners">Partners &amp; Contacts</button>
   <button data-view="setup">Setup Plans</button>
   <button data-view="forecast">Growth Forecast</button>
+  <button data-view="chargers">Charger Types</button>
+  <button data-view="calculator">Charger Calculator</button>
   <button data-view="ask">Ask the Agent</button>
 </nav>
 <main id="root"></main>
@@ -327,6 +329,138 @@ views.forecast = async () => {
     </div>`;
 };
 
+views.chargers = async () => {
+  const d = await api("/charger-types");
+  return `
+    <div class="card"><h3>All available charger types (${d.count})</h3>
+      <div class="muted">Sorted by kW. Each row shows benefits, ideal usage window, and per-unit equipment CapEx.</div>
+      <table style="margin-top:8px"><thead><tr>
+        <th>Charger</th><th>Type</th><th>kW</th><th>Connector</th><th>Per-session</th><th>Equip. CapEx</th><th>Best timing</th><th>Vehicles</th>
+      </tr></thead><tbody>
+      ${d.chargers.map(c=>`
+        <tr>
+          <td><b>${c.label}</b><div class="muted">${c.id} · OCPP ${c.ocpp}</div></td>
+          <td><span class="pill ${c.current_type.startsWith('DC')?'hw':''}">${c.current_type}</span></td>
+          <td><b>${c.kw}</b> <span class="muted">kW</span><div class="muted">${c.voltage}, ${c.amps} A</div></td>
+          <td>${c.connector}</td>
+          <td>${c.typical_session_hours} h<br><span class="muted">${c.typical_kwh_per_session} kWh</span></td>
+          <td>${inr(c.equipment_capex_inr)}</td>
+          <td class="muted">${c.best_usage_timing}</td>
+          <td class="muted">${(c.vehicles||[]).join(", ")}</td>
+        </tr>
+        <tr><td colspan="8" style="border-bottom:1px solid var(--border); padding:8px 10px; background:#0e1620">
+          <b>Best use:</b> ${c.best_use}
+          <details style="margin-top:4px"><summary>Benefits (${c.benefits.length}) · Limitations (${(c.limitations||[]).length})</summary>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:6px">
+              <div><b>Benefits</b><ul>${c.benefits.map(b=>`<li>${b}</li>`).join("")}</ul></div>
+              <div><b>Limitations</b><ul>${(c.limitations||[]).map(b=>`<li>${b}</li>`).join("")}</ul></div>
+            </div>
+          </details>
+        </td></tr>
+      `).join("")}
+      </tbody></table>
+    </div>`;
+};
+
+views.calculator = async () => {
+  const [cat, eff] = await Promise.all([
+    api("/charger-types"),
+    api("/setup/effective?site_class=city&utilization_pct=100")
+  ]);
+  const rows = cat.chargers.map(c => `
+    <tr>
+      <td><b>${c.label}</b> <span class="muted">(${c.kw} kW, ${c.current_type})</span></td>
+      <td>${inr(c.equipment_capex_inr)}</td>
+      <td><input type="number" min="0" max="20" value="0" data-id="${c.id}" class="qty" style="width:64px"/></td>
+    </tr>`).join("");
+  return `
+    <div class="grid cols-2">
+      <div class="card"><h3>Build your own — choose chargers</h3>
+        <div class="row" style="margin-bottom:10px">
+          <label>Site class
+            <select id="site_class">
+              <option value="city" selected>City</option>
+              <option value="highway">Highway</option>
+              <option value="depot">Depot / fleet</option>
+            </select>
+          </label>
+          <label>Utilization %
+            <input id="utilization" type="number" min="20" max="160" value="100" style="width:72px"/>
+          </label>
+          <button class="primary" id="compute">Compute</button>
+        </div>
+        <table><thead><tr><th>Charger</th><th>Equip CapEx</th><th>Qty</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+      </div>
+      <div class="card"><h3>Most effective charger (annual ROI)</h3>
+        <div class="muted">Ranking assumes site_class=city, utilization=100 %.</div>
+        <div style="margin-top:8px; padding:10px; background:#0e1620; border:1px solid var(--border); border-radius:8px">
+          <div class="stat" style="color:var(--accent-2)">${eff.most_effective.label}</div>
+          <div class="stat-sub">${eff.most_effective.current_type} · ${eff.most_effective.kw} kW · annual ROI ${eff.most_effective.annual_roi_pct} %</div>
+          <div class="kv"><span>CapEx total</span><span>${inr(eff.most_effective.capex_total_inr)}</span></div>
+          <div class="kv"><span>Monthly gross</span><span>${inr(eff.most_effective.monthly_gross_margin_inr)}</span></div>
+          <div class="kv"><span>Payback</span><span>${eff.most_effective.payback_months} mo</span></div>
+          <div class="muted" style="margin-top:6px"><b>Best use:</b> ${eff.most_effective.best_use}</div>
+          <div class="muted"><b>Timing:</b> ${eff.most_effective.best_usage_timing}</div>
+        </div>
+        <details style="margin-top:10px" open><summary>Full ranking (${eff.ranking.length})</summary>
+          <table style="margin-top:6px"><thead><tr><th>#</th><th>Charger</th><th>kW</th><th>Annual ROI</th><th>Payback</th></tr></thead>
+          <tbody>${eff.ranking.map((r,i)=>`<tr><td>${i+1}</td><td>${r.label}</td><td>${r.kw}</td><td>${r.annual_roi_pct}%</td><td>${r.payback_months ?? "—"} mo</td></tr>`).join("")}</tbody></table>
+        </details>
+      </div>
+    </div>
+    <div class="card" id="calc-out" style="margin-top:14px; display:none"></div>`;
+};
+
+async function runCalculator() {
+  const sels = $$(".qty").map(i => ({id: i.dataset.id, count: Number(i.value)||0})).filter(x => x.count > 0);
+  const out = $("#calc-out");
+  if (!sels.length) {
+    out.style.display = "block";
+    out.innerHTML = `<div class="muted">Pick at least one charger quantity above.</div>`;
+    return;
+  }
+  const body = {selections: sels, utilization_pct: Number($("#utilization").value)||100, site_class: $("#site_class").value};
+  out.style.display = "block";
+  out.innerHTML = `<div class="muted">Computing…</div>`;
+  try {
+    const r = await fetch("/setup/custom", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(body)});
+    const j = await r.json();
+    if (!r.ok) { out.innerHTML = `<div style="color:#fca5a5">${j.detail || "error"}</div>`; return; }
+    const t = j.totals;
+    out.innerHTML = `
+      <h3>Your custom plan — ${t.bays} bay${t.bays>1?'s':''}, ${t.installed_kw} kW total · ${j.site_class}, ${j.utilization_pct}% utilization</h3>
+      <div class="grid cols-3" style="margin-top:8px">
+        <div class="card"><h3>CapEx breakdown</h3>
+          <div class="stat">${inr(t.capex_total_inr)}</div>
+          <div class="kv"><span>Equipment</span><span>${inr(t.equipment_capex_inr)}</span></div>
+          <div class="kv"><span>Civil (per bay)</span><span>${inr(t.civil_inr)}</span></div>
+          <div class="kv"><span>Panel + cabling</span><span>${inr(t.panel_inr)}</span></div>
+          <div class="kv"><span>Transformer share</span><span>${inr(t.transformer_inr)}</span></div>
+          <div class="kv"><span>CSMS setup</span><span>${inr(t.csms_setup_inr)}</span></div>
+          <div class="kv"><span>Signage + IoT + CCTV</span><span>${inr(t.signage_iot_cctv_inr)}</span></div>
+          <div class="kv"><span>Permits + PM</span><span>${inr(t.permits_pm_inr)}</span></div>
+          <div class="kv"><span>Contingency 8%</span><span>${inr(t.contingency_inr)}</span></div>
+        </div>
+        <div class="card"><h3>Monthly OpEx + revenue</h3>
+          <div class="stat">${inr(t.monthly_gross_margin_inr)}<span class="muted" style="font-size:12px"> gross/mo</span></div>
+          <div class="kv"><span>Monthly revenue</span><span>${inr(t.monthly_revenue_inr)}</span></div>
+          <div class="kv"><span>Monthly OpEx</span><span>${inr(t.monthly_opex_inr)}</span></div>
+          <div class="kv"><span>Payback</span><span><b>${t.payback_months ?? "—"} months</b></span></div>
+          <div class="kv"><span>Annual kWh delivered</span><span>${fmt(t.annual_kwh_delivered)}</span></div>
+        </div>
+        <div class="card"><h3>Selection lines</h3>
+          ${j.selections.map(l=>`<div class="kv"><span>${l.count} × ${l.label}</span><span>${inr(l.line_equipment_capex_inr)}</span></div>`).join("")}
+        </div>
+      </div>
+      <details style="margin-top:10px" open><summary>Applicable subsidies</summary>
+        <ul>${j.applicable_subsidies.map(s=>`<li>${s}</li>`).join("")}</ul>
+      </details>`;
+  } catch (e) {
+    out.innerHTML = `<div style="color:#fca5a5">${e.message}</div>`;
+  }
+}
+
 views.ask = async () => {
   return `
     <div class="card"><h3>Ask the EV Co-Pilot</h3>
@@ -369,6 +503,9 @@ async function mount(view) {
   if (view === "ask") {
     $("#go").addEventListener("click", runAsk);
     $("#q").addEventListener("keydown", e => { if (e.key === "Enter") runAsk(); });
+  }
+  if (view === "calculator") {
+    $("#compute").addEventListener("click", runCalculator);
   }
 }
 

@@ -21,6 +21,10 @@ Trigger on any of:
 - "Partner contacts" / "site host" / "fuel retail co-location" / "OEM"
 - "Lowest cost setup" / "individual vs partner" / "franchise" plan
 - "Forecast" / "growth" / "2030 prediction"
+- "Charger types" / "different kW" / "AC vs DC" / "benefits and timing"
+- "Customize plan" / "what if I pick a 60 kW charger" / "build my own setup"
+- "Most effective charger" / "which charger gives best ROI"
+- "Refresh data" / "fetch latest"
 
 ## How to run
 
@@ -57,6 +61,10 @@ Trigger on any of:
    | Lowest-cost solo setup plan | `GET /setup?mode=solo` |
    | Partner-vendor setup options | `GET /setup?mode=partner` |
    | TN EV growth forecast to 2030 | `GET /forecast` |
+   | All charger kW types + benefits + timing | `GET /charger-types` (filter `?current_type=AC\|DC\|DC Fast\|DC Ultra-Fast`) |
+   | Custom setup plan from chosen chargers | `POST /setup/custom` with `{selections:[{id,count}], utilization_pct, site_class}` |
+   | Most effective charger (ROI ranking) | `GET /setup/effective?site_class=&utilization_pct=` |
+   | Manual data refresh from upstream feeds | `POST /refresh` |
 
 ## Output convention
 

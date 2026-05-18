@@ -1,0 +1,262 @@
+{
+  "as_of": "2024-12-31",
+  "currency": "INR",
+  "notes": "Equipment + commissioning cost per single charger unit. Site civils, transformer share, and CSMS are computed separately in the setup calculator. Throughput numbers assume an average EV battery at 50% SoC start and 80% SoC stop (ie. 30% of battery capacity delivered per session).",
+  "chargers": [
+    {
+      "id": "AC-3.3-BHARAT",
+      "label": "Bharat AC-001",
+      "current_type": "AC",
+      "kw": 3.3,
+      "voltage": "230 V single-phase",
+      "amps": 15,
+      "connector": "IEC 60309 / 3-pin 15A",
+      "ocpp": "1.6J",
+      "typical_session_hours": 7,
+      "typical_kwh_per_session": 12,
+      "equipment_capex_inr": 25000,
+      "vehicles": ["e-2W", "e-3W", "small e-4W (overnight)"],
+      "best_use": "Residential, fleet depot overnight, MTC bus depot trickle.",
+      "benefits": [
+        "Lowest CapEx — pays back in <12 months even at modest utilization.",
+        "Minimal grid burden — fits on a 1-phase LT connection.",
+        "Compatible with the widest installed-base of 2W/3W EVs in TN."
+      ],
+      "best_usage_timing": "Overnight 10 pm – 6 am; off-peak tariff slot.",
+      "limitations": ["Not suitable for 4W passenger commute."]
+    },
+    {
+      "id": "AC-7.4-TYPE2",
+      "label": "Type 2 AC 7.4 kW",
+      "current_type": "AC",
+      "kw": 7.4,
+      "voltage": "230 V single-phase",
+      "amps": 32,
+      "connector": "Type 2 (IEC 62196-2)",
+      "ocpp": "1.6J / 2.0.1",
+      "typical_session_hours": 5,
+      "typical_kwh_per_session": 28,
+      "equipment_capex_inr": 45000,
+      "vehicles": ["e-4W passenger (Tata Tiago, Nexon, MG ZS, BYD)"],
+      "best_use": "Home wallbox, apartment podium parking, mall overnight.",
+      "benefits": [
+        "Universal Type-2 connector standard for all new Indian 4W EVs.",
+        "Single-phase install — no HT upgrade needed.",
+        "Low maintenance, ~12-year service life."
+      ],
+      "best_usage_timing": "Overnight + workday office hours (8 am – 6 pm).",
+      "limitations": ["~5 hr session — not for in-route top-ups."]
+    },
+    {
+      "id": "AC-11-TYPE2",
+      "label": "Type 2 AC 11 kW (3φ)",
+      "current_type": "AC",
+      "kw": 11,
+      "voltage": "415 V three-phase",
+      "amps": 16,
+      "connector": "Type 2",
+      "ocpp": "1.6J / 2.0.1",
+      "typical_session_hours": 3.5,
+      "typical_kwh_per_session": 30,
+      "equipment_capex_inr": 75000,
+      "vehicles": ["e-4W passenger, e-LCV"],
+      "best_use": "Office parking, tech park, hotel destination charging.",
+      "benefits": [
+        "Roughly halves the AC-7.4 session time.",
+        "3-phase balanced load — friendlier on the DT."
+      ],
+      "best_usage_timing": "Workday 9 am – 6 pm or hotel overnight stay.",
+      "limitations": ["Requires 3-phase LT supply at the site."]
+    },
+    {
+      "id": "AC-22-TYPE2",
+      "label": "Type 2 AC 22 kW (3φ)",
+      "current_type": "AC",
+      "kw": 22,
+      "voltage": "415 V three-phase",
+      "amps": 32,
+      "connector": "Type 2",
+      "ocpp": "1.6J / 2.0.1",
+      "typical_session_hours": 2,
+      "typical_kwh_per_session": 32,
+      "equipment_capex_inr": 90000,
+      "vehicles": ["e-4W with 22 kW onboard charger (premium)", "e-LCV"],
+      "best_use": "Mall, restaurant, hotel, F&B destination — couples with 1-3 hr dwell time.",
+      "benefits": [
+        "Best AC option — full top-up in 2 hours.",
+        "Cheaper than even the smallest DC chargers.",
+        "Long lifecycle, minimal cooling needs."
+      ],
+      "best_usage_timing": "Peak retail hours 11 am – 10 pm; dynamic pricing recommended.",
+      "limitations": ["Many sub-15-lakh 4Ws have only 7.4 kW onboard — actual throughput limited."]
+    },
+    {
+      "id": "DC-15-BHARAT-GBT",
+      "label": "Bharat DC-001 (GB/T 15 kW)",
+      "current_type": "DC",
+      "kw": 15,
+      "voltage": "72 V DC",
+      "amps": 200,
+      "connector": "GB/T",
+      "ocpp": "1.6J",
+      "typical_session_hours": 1.2,
+      "typical_kwh_per_session": 12,
+      "equipment_capex_inr": 250000,
+      "vehicles": ["e-3W, e-rickshaw, small e-2W swap-station feed"],
+      "best_use": "Auto-stands, e-rickshaw depots, last-mile delivery hubs.",
+      "benefits": [
+        "Cheapest DC option; pays back fastest in dense 3W belts (Madurai, Trichy, Chennai-North).",
+        "Lower-voltage = cheaper power electronics + safer install."
+      ],
+      "best_usage_timing": "Throughout day — 3W fleet has high duty cycle.",
+      "limitations": ["GB/T connector — limited support on new 4Ws."]
+    },
+    {
+      "id": "DC-30-CCS2",
+      "label": "CCS2 DC 30 kW",
+      "current_type": "DC",
+      "kw": 30,
+      "voltage": "200-500 V DC",
+      "amps": 60,
+      "connector": "CCS2",
+      "ocpp": "1.6J / 2.0.1",
+      "typical_session_hours": 1.2,
+      "typical_kwh_per_session": 18,
+      "equipment_capex_inr": 450000,
+      "vehicles": ["e-4W small (Tata Tigor EV, Punch EV, MG Comet)"],
+      "best_use": "Urban neighborhood, residential complex shared bay, kirana plazas.",
+      "benefits": [
+        "Sweet spot for small DC — under-1-hour top-ups.",
+        "Compact footprint, often pole-mountable."
+      ],
+      "best_usage_timing": "Workday 8 am – 8 pm; high turn-over.",
+      "limitations": ["Underpowered for highway use or large packs."]
+    },
+    {
+      "id": "DC-60-CCS2",
+      "label": "CCS2 DC 60 kW",
+      "current_type": "DC",
+      "kw": 60,
+      "voltage": "200-500 V DC",
+      "amps": 120,
+      "connector": "CCS2",
+      "ocpp": "1.6J / 2.0.1",
+      "typical_session_hours": 0.7,
+      "typical_kwh_per_session": 22,
+      "equipment_capex_inr": 750000,
+      "vehicles": ["all current Indian e-4W passenger; e-LCV"],
+      "best_use": "Mall, fuel-station co-location, urban hub.",
+      "benefits": [
+        "Workhorse of Indian public DC — broad vehicle compatibility.",
+        "30-45 min full top-up matches typical mall dwell time.",
+        "Make-in-India options available under FAME-II PLI."
+      ],
+      "best_usage_timing": "Daytime peak 10 am – 9 pm; tariff INR 18-22 / kWh sustainable.",
+      "limitations": ["Highway use only as overflow / lower-power bay."]
+    },
+    {
+      "id": "DC-120-CCS2",
+      "label": "CCS2 DC 120 kW",
+      "current_type": "DC Fast",
+      "kw": 120,
+      "voltage": "200-1000 V DC",
+      "amps": 200,
+      "connector": "CCS2",
+      "ocpp": "2.0.1",
+      "typical_session_hours": 0.42,
+      "typical_kwh_per_session": 28,
+      "equipment_capex_inr": 1300000,
+      "vehicles": ["mid-range e-4W (BYD Atto, Mahindra BE, Hyundai Kona)", "e-LCV"],
+      "best_use": "Urban premium hub, highway entry plaza, fleet rapid-turnaround.",
+      "benefits": [
+        "20-30 min sessions — passenger-friendly for highway dashes.",
+        "Liquid-cooled gun supports continuous duty.",
+        "Future-proof for vehicles up to ~150 kW peak."
+      ],
+      "best_usage_timing": "All-day; peak utilization 11 am – 10 pm on highway, 7-9 pm in city.",
+      "limitations": ["Requires HT connection + 250-400 kVA DT."]
+    },
+    {
+      "id": "DC-180-CCS2",
+      "label": "CCS2 DC 180 kW",
+      "current_type": "DC Fast",
+      "kw": 180,
+      "voltage": "200-1000 V DC",
+      "amps": 250,
+      "connector": "CCS2",
+      "ocpp": "2.0.1",
+      "typical_session_hours": 0.33,
+      "typical_kwh_per_session": 32,
+      "equipment_capex_inr": 1750000,
+      "vehicles": ["premium e-4W (Volvo XC40, BMW iX, BYD Seal)"],
+      "best_use": "NH48 / NH44 highway plazas, intercity flagship sites.",
+      "benefits": [
+        "Sub-25-min sessions enable 700 km/day intercity travel.",
+        "Eligible for higher CapEx subsidy under PM-eDrive highway scheme."
+      ],
+      "best_usage_timing": "Weekday morning + weekend leisure traffic windows.",
+      "limitations": ["Vehicle pool that can accept 180 kW is still small (<15 %)."]
+    },
+    {
+      "id": "DC-240-CCS2",
+      "label": "CCS2 DC 240 kW Ultra-Fast",
+      "current_type": "DC Ultra-Fast",
+      "kw": 240,
+      "voltage": "200-1000 V DC",
+      "amps": 350,
+      "connector": "CCS2 (HPC, liquid-cooled)",
+      "ocpp": "2.0.1",
+      "typical_session_hours": 0.25,
+      "typical_kwh_per_session": 35,
+      "equipment_capex_inr": 2200000,
+      "vehicles": ["premium e-4W with 800 V architecture (Kia EV6 GT, Porsche Taycan, Hyundai IONIQ 5/6)"],
+      "best_use": "Highway flagship — Krishnagiri, Sriperumbudur, Vellore, Salem.",
+      "benefits": [
+        "15-20 min full top-up — best brand experience.",
+        "Pulls high-tariff customers; INR 24-28 / kWh sustainable.",
+        "Maximum subsidy stack under PM-eDrive."
+      ],
+      "best_usage_timing": "All daylight hours on highway; weekend evenings.",
+      "limitations": ["High CapEx; needs 500+ kVA HT connection and on-site BESS recommended."]
+    },
+    {
+      "id": "DC-350-CCS2",
+      "label": "CCS2 DC 350 kW Hyper-Fast",
+      "current_type": "DC Ultra-Fast",
+      "kw": 350,
+      "voltage": "200-1000 V DC",
+      "amps": 500,
+      "connector": "CCS2 (MCS-ready)",
+      "ocpp": "2.0.1",
+      "typical_session_hours": 0.22,
+      "typical_kwh_per_session": 50,
+      "equipment_capex_inr": 3200000,
+      "vehicles": ["e-bus", "e-HCV/LCV", "future 800 V e-4W"],
+      "best_use": "Logistics yards, intercity bus terminals (Koyambedu, Salem, Madurai).",
+      "benefits": [
+        "Required for commercial e-trucks (Eicher Pro 2049, Tata Ace Pro) to be viable on intercity routes.",
+        "Pre-positions you for MCS upgrade (1000 kW)."
+      ],
+      "best_usage_timing": "Night cycle for freight fleet (10 pm – 6 am) + scheduled bus windows.",
+      "limitations": ["Demand still emerging — utilization <10% in 2024-25; subsidy-dependent."]
+    },
+    {
+      "id": "DC-50-CHADEMO",
+      "label": "CHAdeMO 50 kW",
+      "current_type": "DC",
+      "kw": 50,
+      "voltage": "150-500 V DC",
+      "amps": 125,
+      "connector": "CHAdeMO",
+      "ocpp": "1.6J",
+      "typical_session_hours": 0.8,
+      "typical_kwh_per_session": 22,
+      "equipment_capex_inr": 700000,
+      "vehicles": ["older Nissan Leaf, Tata e-Tigor EV (CHAdeMO variant)"],
+      "best_use": "Legacy fleet support; aging out.",
+      "benefits": ["Bi-directional V2G capable (CHAdeMO 2.0)."],
+      "best_usage_timing": "Day-time, on-demand.",
+      "limitations": ["CHAdeMO is being deprecated in India; not recommended for new sites."]
+    }
+  ]
+}
