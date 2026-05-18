@@ -37,17 +37,18 @@
     {"id": "TN-IT-008", "operator": "Tata Power EZ Charge",  "name": "One Indiabulls Park Ambattur","district": "Chennai", "location": "One Indiabulls Park, Ambattur Industrial Estate, Chennai 600058", "lat": 13.1062, "lng": 80.1543, "connectors": [{"type": "CCS2", "kw": 60, "count": 1}, {"type": "Type2 AC", "kw": 22, "count": 4}], "sessions_30d": 1180, "revenue_30d": 216000, "expenses_30d": 106000, "uptime_pct": 95.2, "highway": false, "site_class": "it_park", "site_host": "Indiabulls Real Estate"},
     {"id": "TN-IT-009", "operator": "Ather Grid",            "name": "ELCOT SEZ Sholinganallur",  "district": "Chennai", "location": "ELCOT SEZ, Sholinganallur, OMR, Chennai 600119", "lat": 12.8970, "lng": 80.2266, "connectors": [{"type": "Type2 AC", "kw": 22, "count": 6}, {"type": "Ather Connector", "kw": 3.3, "count": 10}], "sessions_30d": 2980, "revenue_30d": 312000, "expenses_30d": 132000, "uptime_pct": 98.0, "highway": false, "site_class": "it_park", "site_host": "ELCOT (Govt. of TN)"},
     {"id": "TN-IT-010", "operator": "Tata Power EZ Charge",  "name": "TIDEL Park Coimbatore",     "district": "Coimbatore", "location": "TIDEL Park, ELCOSEZ, Vilankurichi Rd, Coimbatore 641014", "lat": 11.0335, "lng": 77.0322, "connectors": [{"type": "CCS2", "kw": 60, "count": 1}, {"type": "Type2 AC", "kw": 22, "count": 4}], "sessions_30d": 1240, "revenue_30d": 232000, "expenses_30d": 116000, "uptime_pct": 96.4, "highway": false, "site_class": "it_park", "site_host": "TIDCO"},
-    {"id": "TN-IT-011", "operator": "ChargeZone",            "name": "Mahindra World City IT SEZ","district": "Chengalpattu", "location": "Mahindra World City, NH32, Natham Sub-Post, Chengalpattu 603002", "lat": 12.7783, "lng": 80.0192, "connectors": [{"type": "CCS2", "kw": 120, "count": 1}, {"type": "Type2 AC", "kw": 22, "count": 6}], "sessions_30d": 1460, "revenue_30d": 348000, "expenses_30d": 162000, "uptime_pct": 95.5, "highway": false, "site_class": "it_park", "site_host": "Mahindra Lifespaces"}
+    {"id": "TN-IT-011", "operator": "ChargeZone", "name": "Mahindra World City IT SEZ","district": "Chengalpattu", "location": "Mahindra World City, NH32, Natham Sub-Post, Chengalpattu 603002", "lat": 12.7783, "lng": 80.0192, "connectors": [{"type": "CCS2", "kw": 120, "count": 1}, {"type": "Type2 AC", "kw": 22, "count": 6}], "sessions_30d": 1460, "revenue_30d": 348000, "expenses_30d": 162000, "uptime_pct": 95.5, "highway": false, "site_class": "it_park", "site_host": "Mahindra Lifespaces"},
+    {"id": "TN-IT-012", "operator": "Tata Power EZ Charge", "name": "DLF IT Park Taramani",       "district": "Chennai",     "location": "DLF IT Park / SEZ, 1/124 Shivaji Gardens, Rajiv Gandhi Salai (OMR), Taramani, Chennai 600113", "lat": 12.9882, "lng": 80.2479, "connectors": [{"type": "CCS2", "kw": 60, "count": 2}, {"type": "Type2 AC", "kw": 22, "count": 6}], "sessions_30d": 2240, "revenue_30d": 432000, "expenses_30d": 198000, "uptime_pct": 97.4, "highway": false, "site_class": "it_park", "site_host": "DLF"}
   ],
   "summary": {
-    "total_stations": 34,
-    "chennai_stations": 18,
+    "total_stations": 35,
+    "chennai_stations": 19,
     "highway_stations": 9,
-    "it_park_stations": 11,
-    "total_sessions_30d": 48690,
-    "total_revenue_30d_inr": 10625000,
-    "total_expenses_30d_inr": 5092000,
-    "avg_uptime_pct": 95.2,
-    "it_park_avg_uptime_pct": 96.6
+    "it_park_stations": 12,
+    "total_sessions_30d": 50930,
+    "total_revenue_30d_inr": 11057000,
+    "total_expenses_30d_inr": 5290000,
+    "avg_uptime_pct": 95.3,
+    "it_park_avg_uptime_pct": 96.7
   }
 }
