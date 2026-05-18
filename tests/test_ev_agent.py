@@ -102,6 +102,38 @@ def test_api_stations_highway_only():
     assert all(s["highway"] for s in j["stations"])
 
 
+def test_api_stations_it_park_filter():
+    r = client.get("/stations", params={"site_class": "it_park"})
+    assert r.status_code == 200
+    j = r.json()
+    assert j["count"] >= 5
+    assert all(s.get("site_class") == "it_park" for s in j["stations"])
+    assert all(s.get("site_host") for s in j["stations"])
+
+
+def test_partners_has_it_park_category():
+    data = intelligence.list_partners()
+    titles = [c["category"].lower() for c in data["categories"]]
+    assert any("it park" in t for t in titles)
+    it = next(c for c in data["categories"] if "it park" in c["category"].lower())
+    assert len(it["contacts"]) >= 5
+    assert any("tidel" in (c["name"].lower()) for c in it["contacts"])
+
+
+def test_agent_routes_it_park_partner_question():
+    r = run(Query(question="Who is the leasing contact at TIDEL Park?"))
+    assert r.intent == "partners"
+    cats = [c["category"].lower() for c in r.data["categories"]]
+    assert any("it park" in c for c in cats)
+
+
+def test_stations_summary_includes_it_park_count():
+    data = stations.list_stations()
+    # The bundled JSON summary should now include IT-park stations
+    assert any(s.get("site_class") == "it_park" for s in data["stations"])
+
+
+
 def test_charger_catalog_has_all_classes():
     d = charger_catalog.list_chargers()
     assert d["count"] >= 10
