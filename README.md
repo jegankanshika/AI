@@ -1,160 +1,100 @@
-# AI
+# EV Charging Co-Pilot — Tamil Nadu
 
-High-level design and reference architecture for **Credit Co-Pilot** — an
-agentic loan underwriting assistant. The repo holds the design write-up, a
-branded PDF, a Visio-style architecture diagram rendered with real tech logos,
-and the scripts that generate them.
+An agent + browser UI that gives an EV-charging company end-to-end market
+intelligence and site-planning for Tamil Nadu. Covers district-wise EV
+registrations, public charging stations with per-station P&L, ranked
+challenges + solutions, demand-weighted future site recommendations
+(Chennai + highway + IT-park / Tech-SEZ), partner contacts with
+playbooks, lowest-cost setup plans and partner-vendor comparison, a
+charger-type catalog with cost / payback calculator, and a 2030 TN EV
+stock + charging-demand forecast.
 
----
-
-## Contents
-
-| File | What it is |
-|---|---|
-| `credit_copilot_design.md` | Markdown source of the Credit Co-Pilot high-level design (architecture, tech stack, data model, sequence flow, compliance, rollout). |
-| `CreditCoPilot_Design.pdf` | Branded multi-page PDF of the design — cover page, exec summary + KPIs, full-page architecture figure, components, tech stack, tool surface, sequence, compliance, rollout, open questions. |
-| `credit_copilot_architecture.png` / `.pdf` | Standalone architecture diagram with logos for Claude, AWS (EKS, S3, KMS, Textract, SageMaker, API Gateway), Postgres, Kafka, Temporal, Redis, OpenSearch, MLflow, OPA, Auth0, FastAPI, React, Terraform, GitHub Actions, Datadog, Langfuse, Slack. |
-| `INSTALL.md` | System + Python prerequisites and step-by-step setup. |
-| `requirements.txt` | Pinned Python dependencies. |
-| `training_data/` | Synthetic loan dataset, schema dictionary, generator script, and policy snippets used as the RAG corpus. |
-| `app/` | Agent vertical slice — schemas, deterministic tools (`extract_document`, `compute_ratios`, `lookup_policy`, `score_pd`, `check_hard_gates`), LangGraph orchestration with Haiku critic + OPA-style hard-gate adjudication, audit-event emission, FastAPI service, **single-page underwriter UI** at `/`, and offline eval. |
-| `policies/` | Rego policy for hard gates — production-of-record for the deterministic decline rules. |
-| `tests/` | Pytest suite covering tools and the offline agent path (no API key needed). |
+See `ev_charging_design.md` for the full design, data dictionary, and
+roadmap.
 
 ---
 
-## Run the agent
+## Run
 
 ```bash
 pip install -r requirements.txt
-pytest                                           # offline test suite (35 unit + 2 live, live skipped without API key)
-python -m app.eval.run_eval --limit 30           # synthetic eval
-uvicorn app.api.main:app --reload                # serves the UI at http://localhost:8000/
+uvicorn app_ev.api.main:app --reload --port 8001
+# UI:  http://localhost:8001/
 ```
 
-Open `http://localhost:8000/` for the underwriter UI: pick a preset
-(strong, thin file, sanctions hit, high DTI), tweak the form, and click
-**Underwrite** to see the rendered memo, ratios, PD breakdown, adverse-
-action codes, citations, and tool trace.
-
-### Sample PDFs to upload
+Try the natural-language interface:
 
 ```bash
-python scripts/make_sample_pdfs.py            # writes samples/paystub.pdf, w2.pdf, bank_statement.pdf
+curl -s localhost:8001/ask \
+  -H "content-type: application/json" \
+  -d '{"question":"Show me future highway charging locations"}' | jq
 ```
 
-In the UI, pick the document type from the dropdown, choose one of those
-files, click **Upload**, then **Underwrite**. Try uploading just the
-paystub against the **Strong profile** preset — the fixture annualizes to
-$90 k while the preset states $110 k, so the income-verification card
-flags a material gap and the decision moves to `refer_to_human`.
+Or hit any tool endpoint directly:
 
-Live mode (`run_agent(app, mode="live")`) uses `claude-opus-4-7` via the
-Anthropic SDK and requires `ANTHROPIC_API_KEY`. Offline mode uses a
-deterministic rule path so CI runs without secrets.
-
-### LLM providers
-
-The live agent path defaults to the Anthropic SDK. To run against a local
-[Ollama](https://ollama.com) server instead:
-
-```bash
-export LLM_PROVIDER=ollama
-export LLM_MODEL=llama3.1            # or any tool-calling model you've pulled
-export LLM_CRITIC_MODEL=llama3.2:3b  # optional, smaller model for the critic
-export OLLAMA_HOST=http://localhost:11434
-```
-
-The provider is selected by env at startup; no code changes are needed. The
-graph and critic talk to a thin shim (`app/llm/ollama.py`) that translates
-between the Anthropic message/tool format and Ollama's `/api/chat` API.
-
-Note: the model must support tool calling (Llama 3.1, Qwen 2.5, Mistral
-Small, etc.). Models without tool-call support will reply with text-only
-turns and the agent will terminate without submitting a memo.
-
-### Persistent audit log (optional)
-
-By default audit events go to a local `audit.log` JSONL file with a tamper-
-evident SHA-256 chain. To persist to a real database, set `DATABASE_URL`:
-
-```bash
-# Postgres (prod)
-export DATABASE_URL=postgresql+psycopg://user:pw@host:5432/credit_copilot
-# SQLite (dev)
-export DATABASE_URL=sqlite:////absolute/path/to/audit.db
-
-python -m app.audit_cli init                       # create the audit_events table
-python -m app.audit_cli list --application-id ...  # recent runs + decision
-python -m app.audit_cli show <run_id>              # full event timeline + chain verify
-```
-
-When `DATABASE_URL` is set, the API also exposes `GET /audit/runs` and
-`GET /audit/runs/{run_id}` for the same data.
-
-### CI
-
-- `.github/workflows/ci.yml` — runs `pytest -m "not live"` on every push and PR (Python 3.11 + 3.12 matrix).
-- `.github/workflows/live-tests.yml` — manual `workflow_dispatch` trigger that runs the live integration tests with `secrets.ANTHROPIC_API_KEY`. Enable the nightly cron once a token budget alert is in place.
+| Tool | Endpoint |
+|---|---|
+| TN state summary | `GET /registrations/summary` |
+| District-wise EV counts + RTO locations | `GET /registrations` (or `?district=Chennai`) |
+| All public stations | `GET /stations` (filters: `?district=`, `?highway_only=true`, `?site_class=it_park`) |
+| Total charging stations breakdown | `GET /stations/summary` |
+| Portfolio P&L | `GET /economics` |
+| Challenges + solutions | `GET /challenges` |
+| Future site recommendations | `GET /future?scope=chennai\|highway` |
+| Partner contacts + playbooks | `GET /partners` (filter `?category=it+park`, `fuel`, `mall`, `oem`, `fleet`, `discom`) |
+| Charger-type catalog | `GET /charger-types` |
+| Lowest-cost setup plan | `GET /setup?mode=solo\|partner\|all` |
+| Custom setup plan calculator | `POST /setup/custom` |
+| Most-effective charger ranking | `GET /setup/effective` |
+| TN EV growth forecast to 2030 | `GET /forecast` |
+| Manual data refresh | `POST /refresh` |
 
 ---
 
-## Credit Co-Pilot — at a glance
-
-An agentic AI system that assists human underwriters by automating data
-gathering, analysis, and risk-narrative drafting for loan applications. The
-agent ingests an application packet (PDFs, bank statements, tax returns,
-bureau pulls), reasons over policy rules, computes risk metrics, and produces
-an auditable underwriting memo with a recommended decision
-(approve / decline / refer-to-human).
-
-**Design pillars**
-- Human-in-the-loop — agent recommends, underwriter decides.
-- Auditability — every decision traces to source documents and policy clauses.
-- Compliance-first — ECOA, FCRA, GLBA, GDPR, SR 11-7.
-- Modular — swappable models, tools, and data sources.
-
-**Core stack**
-Claude Opus 4.7 + Haiku 4.5 · LangGraph · FastAPI · Next.js · AWS EKS ·
-Temporal · Postgres + pgvector · Kafka · MLflow + SageMaker · OPA / Camunda ·
-Feast · Datadog + Langfuse.
-
-See `CreditCoPilot_Design.pdf` for the full design.
-
----
-
-## Reproducing the diagram and PDF
-
-Requirements: Python 3.10+, Graphviz.
+## Tests
 
 ```bash
-# system dep (Debian/Ubuntu)
-sudo apt-get install -y graphviz
-
-# python deps
-pip install diagrams reportlab pillow
-
-# generate the architecture PNG/PDF
-python build_diagram.py
-
-# compose the branded design PDF (depends on the PNG above)
-python build_pdf.py
+pytest                                # 29 smoke tests
 ```
 
-Outputs:
-- `credit_copilot_architecture.png` / `.pdf`
-- `CreditCoPilot_Design.pdf`
+CI runs the same suite on Python 3.11 and 3.12 on every push and PR
+against `main`.
 
 ---
 
-## Branches
+## Data refresh
 
-- `main` — stable artifacts.
-- `claude/loan-underwriting-tech-design-iLTw4` — Credit Co-Pilot design work.
+`app_ev/refresh.py` pulls upstream JSON daily into the bundled snapshots
+in `app_ev/data/*.json`. Three run modes:
+
+1. **In-process scheduler** — the FastAPI app starts a 24 h asyncio loop
+   on startup (`app_ev/api/main.py` lifespan).
+2. **Cron** — `0 3 * * * cd /srv/ai && python -m app_ev.refresh`.
+3. **Manual** — `POST /refresh`.
+
+A Playwright scraper at `scripts/scrape_vahan_tn.py` produces the VAHAN
+TN registrations JSON in the exact schema the agent consumes. A GitHub
+Actions workflow at `.github/workflows/refresh-snapshots.yml` runs it
+daily at 03:00 IST and publishes to an orphan `data-snapshots` branch
+so `VAHAN_TN_URL` can point at a stable raw URL.
+
+When an upstream URL env var is unset, that source is skipped and the
+bundled snapshot is retained — dev / CI never breaks.
 
 ---
 
-## License
+## Layout
 
-No license has been declared yet. Treat the contents as **all rights reserved**
-until a license file is added.
+| Path | What's there |
+|---|---|
+| `app_ev/` | Agent vertical slice — schemas, deterministic tools, intent router, FastAPI service, single-page UI. |
+| `app_ev/data/` | Bundled JSON datasets (VAHAN, BEE PCS, challenges, future sites, partners, setup plans, charger catalog, growth forecast). |
+| `app_ev/refresh.py` | Daily upstream-pull job. |
+| `app_ev/api/main.py` | FastAPI service + UI mount. |
+| `app_ev/ui/index.html` | Single-page UI to browse every slice. |
+| `ev_charging_design.md` | Design doc — architecture, data dictionary, roadmap. |
+| `scripts/scrape_vahan_tn.py` | Playwright scraper for the VAHAN dashboard. |
+| `.claude/skills/ev-charging/SKILL.md` | Skill for invoking the agent from Claude Code. |
+| `.github/workflows/ci.yml` | Pytest matrix on Python 3.11 / 3.12. |
+| `.github/workflows/refresh-snapshots.yml` | Daily VAHAN scrape + publish to `data-snapshots` branch. |
+| `tests/test_ev_agent.py` | Pytest smoke suite over the tools, agent, and API. |

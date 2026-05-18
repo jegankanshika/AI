@@ -1,9 +1,6 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q -ra --strict-markers"
-markers = [
-    "live: tests that call the real Anthropic API (skipped unless ANTHROPIC_API_KEY is set)",
-]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
