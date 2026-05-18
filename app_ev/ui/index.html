@@ -108,8 +108,8 @@ views.dashboard = async () => {
         <div class="kv"><span>Four-wheelers</span><span>${fmt(reg.four_wheeler)}</span></div>
         <div class="kv"><span>Bus / Truck</span><span>${fmt(reg.bus_truck)}</span></div>
       </div>
-      <div class="card"><h3>Public Charging Portfolio</h3>
-        <div class="stat">${fmt(st.totals.total_stations)} stations</div>
+      <div class="card"><h3>Total Charging Stations</h3>
+        <div class="stat">${fmt(st.totals.total_stations)}</div>
         <div class="stat-sub">${fmt(st.totals.chennai_stations)} Chennai · ${fmt(st.totals.highway_stations)} highway · ${fmt(st.totals.it_park_stations||0)} IT park · uptime ${st.totals.avg_uptime_pct}%</div>
         <div class="kv"><span>Sessions (30d)</span><span>${fmt(st.totals.total_sessions_30d)}</span></div>
         <div class="kv"><span>Revenue (30d)</span><span>${inr(st.totals.total_revenue_30d_inr)}</span></div>
@@ -158,10 +158,11 @@ views.registrations = async () => {
 };
 
 views.stations = async () => {
-  const [all, hw, it] = await Promise.all([
+  const [all, hw, it, sum] = await Promise.all([
     api("/stations"),
     api("/stations?highway_only=true"),
-    api("/stations?site_class=it_park")
+    api("/stations?site_class=it_park"),
+    api("/stations/summary")
   ]);
   const rows = (lst) => lst.stations.map(s => `
     <tr>
@@ -173,7 +174,23 @@ views.stations = async () => {
       <td><a href="https://www.google.com/maps?q=${s.lat},${s.lng}" target="_blank">map</a></td>
     </tr>`).join("");
   return `
-    <div class="card"><h3>All public charging stations (${all.count})</h3>
+    <div class="grid cols-3">
+      <div class="card"><h3>Total Charging Stations</h3>
+        <div class="stat">${fmt(sum.total_charging_stations)}</div>
+        <div class="stat-sub">${fmt(sum.total_bays)} bays · ${fmt(sum.total_installed_kw)} kW installed · as of ${sum.as_of}</div>
+        <div class="kv"><span>Chennai city</span><span>${fmt(sum.by_site_class.chennai_city)}</span></div>
+        <div class="kv"><span>Highway</span><span>${fmt(sum.by_site_class.highway)}</span></div>
+        <div class="kv"><span>IT park / SEZ</span><span>${fmt(sum.by_site_class.it_park)}</span></div>
+        <div class="kv"><span>Other city / district</span><span>${fmt(sum.by_site_class.other_city)}</span></div>
+      </div>
+      <div class="card"><h3>Connector mix</h3>
+        ${sum.connectors.map(c => `<div class="kv"><span>${c.type}</span><span>${fmt(c.bays)} bays · ${fmt(c.installed_kw)} kW</span></div>`).join("")}
+      </div>
+      <div class="card"><h3>By district</h3>
+        ${Object.entries(sum.by_district).slice(0,8).map(([d,n]) => `<div class="kv"><span>${d}</span><span>${fmt(n)}</span></div>`).join("")}
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px"><h3>All public charging stations (${all.count})</h3>
       <table><thead><tr><th>Station</th><th>District</th><th>Address</th><th>Connectors</th><th>Uptime</th><th>Map</th></tr></thead>
       <tbody>${rows(all)}</tbody></table>
     </div>

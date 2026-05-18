@@ -104,6 +104,11 @@ def stations_endpoint(
     )
 
 
+@app.get("/stations/summary")
+def stations_summary_endpoint() -> dict:
+    return stations.portfolio_summary()
+
+
 @app.get("/stations/{station_id}")
 def station_endpoint(station_id: str) -> dict:
     s = stations.station_detail(station_id)
