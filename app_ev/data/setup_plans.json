@@ -1,0 +1,90 @@
+{
+  "as_of": "2024-12-31",
+  "currency": "INR",
+  "lowest_cost_individual": {
+    "name": "Solo lean 60 kW DC + 2x AC site",
+    "target": "1 bay DC fast (60 kW CCS2) + 2 bay AC (22 kW Type2) on leased 1200 sqft slot",
+    "capex_line_items": [
+      {"item": "60 kW DC CCS2 charger (Servotech / Exicom MII)", "amount": 750000},
+      {"item": "2 x 22 kW Type2 AC chargers",                     "amount": 180000},
+      {"item": "LT/HT panel, ACB, cabling, earthing",             "amount": 320000},
+      {"item": "Civil — canopy, parking markings, foundation",    "amount": 280000},
+      {"item": "TANGEDCO HT connection charges + transformer share","amount": 450000},
+      {"item": "CSMS subscription setup + payment integration",   "amount": 80000},
+      {"item": "Signage, branding, IoT + CCTV",                   "amount": 90000},
+      {"item": "Project mgmt, permits, contingency 8%",           "amount": 170000}
+    ],
+    "capex_total_inr": 2320000,
+    "monthly_opex_inr": {
+      "rent_or_revshare": 60000,
+      "electricity_demand_charge": 22000,
+      "csms_subscription": 8000,
+      "field_ops_share_of_technician": 12000,
+      "insurance": 4000,
+      "marketing": 5000,
+      "total": 111000
+    },
+    "revenue_assumptions": {
+      "sessions_per_day": 14,
+      "avg_kwh_per_session": 18,
+      "avg_tariff_inr_per_kwh": 19,
+      "monthly_revenue_inr": 143640
+    },
+    "payback_months": 36,
+    "applicable_subsidies": [
+      "MHI PM-eDrive: 50-70% CapEx for highway sites",
+      "TN EV Policy 2023: 25% capital subsidy for first 5000 stations",
+      "100% SGST refund on charger purchase for 5 years"
+    ],
+    "notes": "Best for entrepreneur with 1 site, owned/leased shop frontage, willing to operate. Break-even sensitive to utilization > 22%."
+  },
+  "partner_vendor_models": [
+    {
+      "model": "CPO franchise (Tata Power, Statiq, ChargeZone)",
+      "description": "You own the site + land; CPO supplies charger, CSMS, branding, payment. Revenue split.",
+      "owner_capex_inr": 350000,
+      "owner_opex_share_pct": 30,
+      "revenue_split": "CPO 60% / Site owner 40% (typical)",
+      "payback_months": 30,
+      "pros": ["Low CapEx", "Brand traffic via CPO app", "OEM warranty + uptime SLAs"],
+      "cons": ["Lower margin", "Long lock-in (5-7 yrs)", "Limited say in tariff"]
+    },
+    {
+      "model": "Energy operator white-label (Glida / Exicom CaaS)",
+      "description": "Operator funds 70% of CapEx via Charging-as-a-Service; you pay monthly subscription.",
+      "owner_capex_inr": 700000,
+      "owner_opex_share_pct": 50,
+      "monthly_caas_fee_inr": 35000,
+      "payback_months": 32,
+      "pros": ["Predictable opex", "Tech upgrade included", "Site owner keeps brand"],
+      "cons": ["CaaS fee even if utilization low"]
+    },
+    {
+      "model": "Fuel-retail co-location (HPCL/IOCL/BPCL)",
+      "description": "Dealer offers parking slot + HT supply; you bring charger + CSMS.",
+      "owner_capex_inr": 1450000,
+      "owner_opex_share_pct": 70,
+      "revenue_split": "Dealer 15% / Operator 85%",
+      "payback_months": 28,
+      "pros": ["Sanctioned HT power", "Existing footfall", "Government push"],
+      "cons": ["Cap on tariff", "Compliance with PESO + MoPNG"]
+    },
+    {
+      "model": "PPP with TANGEDCO / GCC land bank",
+      "description": "Govt provides land at concessional rate; you operate publicly.",
+      "owner_capex_inr": 2000000,
+      "owner_opex_share_pct": 80,
+      "land_lease_inr_per_year": 60000,
+      "payback_months": 34,
+      "pros": ["Cheap land", "Eligible for max subsidy stack"],
+      "cons": ["Tariff regulated", "Bid process competitive"]
+    }
+  ],
+  "comparison_summary": [
+    {"plan": "Solo lean",                     "capex_inr": 2320000, "payback_months": 36, "margin_profile": "High when utilization > 25%", "best_for": "Single-site entrepreneur"},
+    {"plan": "CPO franchise",                 "capex_inr": 350000,  "payback_months": 30, "margin_profile": "Stable low-margin annuity",    "best_for": "Site-owner who wants minimum CapEx"},
+    {"plan": "Energy operator white-label",   "capex_inr": 700000,  "payback_months": 32, "margin_profile": "Predictable",                  "best_for": "Multi-site SME"},
+    {"plan": "Fuel-retail co-location",       "capex_inr": 1450000, "payback_months": 28, "margin_profile": "Highest with footfall",        "best_for": "Operator scaling 5-20 sites"},
+    {"plan": "PPP govt land",                 "capex_inr": 2000000, "payback_months": 34, "margin_profile": "Subsidy-amplified",            "best_for": "Operator targeting public charging"}
+  ]
+}

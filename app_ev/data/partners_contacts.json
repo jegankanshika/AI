@@ -1,0 +1,56 @@
+{
+  "as_of": "2024-12-31",
+  "categories": [
+    {
+      "category": "Site host — Malls and retail",
+      "playbook": "Walk-in -> Mall GM/Leasing Mgr -> Submit site proposal (load, footprint, revenue share) -> MoU -> 30-90 day fitout",
+      "contacts": [
+        {"name": "Phoenix Marketcity Chennai", "role": "Leasing Manager",   "address": "142 Velachery Main Rd, Chennai 600042", "phone": "+91-44-3902-1000", "email": "leasing.chennai@thephoenixmills.com",      "notes": "Revenue-share 14-18% typical; needs 2 parking bays, 3-phase 100 A"},
+        {"name": "Express Avenue Mall",        "role": "Mall GM",           "address": "49-50L Whites Rd, Royapettah, Chennai 600014","phone": "+91-44-2846-7777", "email": "info@expressavenue.in",                   "notes": "Existing Ather installed; open to add 60 kW DC bays"},
+        {"name": "Forum Vijaya Mall",          "role": "Operations Head",   "address": "183 NSK Salai, Vadapalani, Chennai 600026", "phone": "+91-44-4391-6000", "email": "info@theforummalls.com",                   "notes": "Premier corporate ownership; needs full safety dossier"},
+        {"name": "Brookefields Mall Coimbatore","role": "Leasing Manager",  "address": "Krishnaswamy Rd, Coimbatore 641018",         "phone": "+91-422-435-9999", "email": "info@brookefieldsmall.com",                "notes": "Strong weekend traffic; existing Tata Power"}
+      ]
+    },
+    {
+      "category": "Site host — Fuel retail (MoPNG co-location)",
+      "playbook": "Apply via OMC dealer portal -> District retail head approval -> Co-location MoU -> Installation in 60-90 days",
+      "contacts": [
+        {"name": "Hindustan Petroleum (HPCL) — TN Retail",        "role": "DGM Retail South",            "address": "HPCL Regional Office, Anna Salai, Chennai 600002",       "phone": "+91-44-2852-2000", "email": "tnretail@hpcl.in",   "notes": "Active EV co-location scheme; revenue-share negotiable"},
+        {"name": "Indian Oil (IOCL) — TNPL Division",             "role": "Sr Manager Retail",            "address": "139 Mahatma Gandhi Rd, Nungambakkam, Chennai 600034",     "phone": "+91-44-2829-2000", "email": "tnpl@indianoil.in",  "notes": "Pilot with 50+ TN outlets; preference for 60 kW DC"},
+        {"name": "Bharat Petroleum (BPCL)",                       "role": "Territory Manager Retail",     "address": "BPCL Bhavan, Mount Rd, Chennai 600006",                   "phone": "+91-44-2521-0000", "email": "trsmadras@bharatpetroleum.in", "notes": "Operates 'Bharat Energy on the Move' EV stations"}
+      ]
+    },
+    {
+      "category": "Government — Discom, Land, Approvals",
+      "playbook": "Apply HT/LT load sanction -> TNERC tariff -> single-window TN EV cell -> Site allotment via CMDA/GCC",
+      "contacts": [
+        {"name": "TANGEDCO — Chennai EDC South",                  "role": "Superintending Engineer", "address": "TNEB Building, Anna Salai, Chennai 600002",            "phone": "+91-44-2852-0131", "email": "se.cedcsouth@tangedco.gov.in", "notes": "Sanction HT services, EV-specific tariff under TN EV Policy 2023"},
+        {"name": "Greater Chennai Corporation (GCC)",             "role": "Commissioner",            "address": "Ripon Building, Chennai 600003",                      "phone": "+91-44-2538-3614", "email": "commr.gcc@tn.gov.in",          "notes": "PPP land allotment for public charging within city limits"},
+        {"name": "CMDA — Chennai Metropolitan Dev Authority",      "role": "Member Secretary",        "address": "Thalamuthu Natarajan Bldg, Egmore, Chennai 600008",   "phone": "+91-44-2843-1107", "email": "ms@cmdachennai.gov.in",        "notes": "DCR approvals, road-side and depot allotments"},
+        {"name": "TN Guidance (single-window EV cell)",           "role": "EV Mission Director",     "address": "Industries Dept, Secretariat, Chennai 600009",        "phone": "+91-44-2538-3636", "email": "ev@tnguidance.com",            "notes": "45-day single-window clearance for approved EV stations"}
+      ]
+    },
+    {
+      "category": "Charger OEMs and CSMS providers",
+      "playbook": "Quote -> Pilot order (1-2 units) -> Field trial 90 days -> Master Supply Agreement",
+      "contacts": [
+        {"name": "Exicom Tele-Systems",                           "role": "Head Sales South",         "address": "Plot 65 Sec 32 Gurgaon — South branch DLF IT Park, Chennai", "phone": "+91-124-417-1234", "email": "sales.ev@exicom.in",        "notes": "60 kW / 120 kW / 240 kW Make-in-India CCS2; INR 6-22 L per unit"},
+        {"name": "Servotech Power Systems",                       "role": "BD Manager",               "address": "Sec 18 Noida — South office Chennai",                   "phone": "+91-11-4063-1234", "email": "ev@servotech.in",        "notes": "Aggressive pricing on 60 kW; OCPP 1.6J + 2.0.1"},
+        {"name": "Delta Electronics India",                       "role": "Application Engineer",     "address": "Plot 43 Sector 35 Gurgaon — South branch Chennai",     "phone": "+91-124-487-4900", "email": "evcs.in@deltaww.com",    "notes": "Premium 100/200 kW; 5-year warranty"},
+        {"name": "ABB India E-mobility",                          "role": "Country Sales Mgr",        "address": "ABB Bangalore — TN regional office",                     "phone": "+91-80-2294-9150", "email": "emobility.india@abb.com","notes": "Terra 184 / Terra 360; HCV-grade"},
+        {"name": "Statiq (CSMS + reseller)",                      "role": "Partnerships Lead",        "address": "Spaze i-Tech Park, Sec 49, Gurgaon",                    "phone": "+91-981-869-1111", "email": "partners@statiq.in",     "notes": "White-label CSMS, OCPP 1.6/2.0.1, OCPI 2.2.1"}
+      ]
+    },
+    {
+      "category": "Fleet anchor tenants (B2B offtake)",
+      "playbook": "Commercial discussion -> MOU on guaranteed sessions/month -> Custom tariff + dedicated bay",
+      "contacts": [
+        {"name": "BluSmart Mobility",                             "role": "Charging Infra Lead",      "address": "Gurgaon HQ — Chennai launch team",                       "phone": "+91-981-110-9000", "email": "infra@blu-smart.com",    "notes": "Need 6-10 dedicated DC bays per hub; long contract"},
+        {"name": "Lithium Urban Technologies",                    "role": "Charging Operations",      "address": "Bangalore HQ — Chennai ops",                              "phone": "+91-80-4666-4666", "email": "ops@lithium.in",        "notes": "Corporate cab fleet; needs depot AC + intermittent DC"},
+        {"name": "Magenta Mobility",                              "role": "Fleet Charging Manager",   "address": "Pawan Chambers, Mumbai — Chennai depot",                  "phone": "+91-22-4214-6000", "email": "fleet@magentamobility.com","notes": "Last-mile e-3W/e-LCV; high utilization profile"},
+        {"name": "Ola Electric — Commercial",                     "role": "Charging BD",               "address": "Koramangala, Bangalore",                                 "phone": "+91-80-4555-9999", "email": "charging.bd@olaelectric.com","notes": "Aggressive expansion; co-branded sites possible"},
+        {"name": "Chennai MTC EV Bus Division",                   "role": "Chief Electrical Engineer", "address": "Pallavan House, Anna Salai, Chennai 600002",            "phone": "+91-44-2841-1500", "email": "ce.mtc@tn.gov.in",      "notes": "525 e-buses operational; depot charging tenders"}
+      ]
+    }
+  ]
+}

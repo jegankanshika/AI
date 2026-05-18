@@ -1,0 +1,70 @@
+name: refresh-data-snapshots
+
+on:
+  schedule:
+    # 03:00 IST (= 21:30 UTC previous day) — daily refresh
+    - cron: "30 21 * * *"
+  workflow_dispatch:
+    inputs:
+      limit_rtos:
+        description: "Cap RTOs scraped (smoke test)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  scrape-vahan-tn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright + chromium
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Scrape VAHAN TN dashboard
+        env:
+          LIMIT: ${{ inputs.limit_rtos }}
+        run: |
+          mkdir -p out
+          if [ -n "$LIMIT" ]; then
+            python scripts/scrape_vahan_tn.py --out out/tn_ev_registrations.json --limit-rtos "$LIMIT"
+          else
+            python scripts/scrape_vahan_tn.py --out out/tn_ev_registrations.json
+          fi
+
+      - name: Publish snapshot to `data-snapshots` branch
+        run: |
+          git config user.name "vahan-snapshot-bot"
+          git config user.email "vahan-snapshot-bot@users.noreply.github.com"
+          # Orphan branch — only the latest JSON, no history bloat.
+          git fetch origin data-snapshots || true
+          if git show-ref --verify --quiet refs/remotes/origin/data-snapshots; then
+            git switch data-snapshots
+          else
+            git switch --orphan data-snapshots
+            git rm -rf . || true
+          fi
+          mkdir -p tn
+          cp out/tn_ev_registrations.json tn/tn_ev_registrations.json
+          git add tn/tn_ev_registrations.json
+          git commit -m "snapshot $(date -u +%Y-%m-%dT%H:%MZ) — TN VAHAN EV registrations" || echo "no changes"
+          git push origin data-snapshots
+
+      - name: Summarise
+        run: |
+          jq '{as_of, total_registered_evs, district_count: (.districts | length)}' out/tn_ev_registrations.json
+          echo
+          echo "Raw URL once pushed:"
+          echo "  https://raw.githubusercontent.com/${{ github.repository }}/data-snapshots/tn/tn_ev_registrations.json"
+          echo
+          echo "Wire it into the agent with:"
+          echo "  export VAHAN_TN_URL=https://raw.githubusercontent.com/${{ github.repository }}/data-snapshots/tn/tn_ev_registrations.json"

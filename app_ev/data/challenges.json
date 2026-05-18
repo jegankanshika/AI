@@ -1,0 +1,100 @@
+{
+  "as_of": "2024-12-31",
+  "challenges": [
+    {
+      "id": "CH-01",
+      "title": "Grid capacity and discom approvals",
+      "severity": "high",
+      "description": "DT (distribution transformer) capacity at proposed sites is often inadequate for 60 kW+ fast chargers. TANGEDCO HT/LT sanction can take 90-180 days; load augmentation (new transformer) adds 4-9 months.",
+      "impact": "Delays site activation by 3-9 months; ~22% of CapEx is locked unproductively during approval.",
+      "solutions": [
+        "Pre-screen sites using TANGEDCO 11 kV feeder maps; reject sites where existing DT headroom < 100 kVA.",
+        "Co-locate with battery energy storage (BESS, 100-250 kWh) to shave demand peaks and avoid HT upgrade.",
+        "Apply under TN EV Policy 2023 'single-window' clearance — committed 45-day sanction for designated EV stations."
+      ]
+    },
+    {
+      "id": "CH-02",
+      "title": "Real-estate cost and site availability inside Chennai",
+      "severity": "high",
+      "description": "Prime corridor sites (OMR, ECR, Anna Salai, Mount Rd) command INR 180-350/sqft/month rent; 4-bay DC fast site needs 1500-2500 sqft.",
+      "impact": "Rent is 28-40% of OpEx, which is the largest single cost line and stretches payback to 4-5 years.",
+      "solutions": [
+        "Partner with malls (Phoenix, Express Ave, Forum) on revenue-share (12-18% of energy revenue) instead of fixed rent.",
+        "Tie up with HPCL/IOCL/BPCL retail outlets — fuel stations have spare frontage, sanctioned HT supply, and EV co-location is encouraged under MoPNG 2022 guidelines.",
+        "Use TN govt PPP land bank (Greater Chennai Corp, CMDA) which offers 30-year lease at concessional rate for public charging."
+      ]
+    },
+    {
+      "id": "CH-03",
+      "title": "Charger utilization below break-even",
+      "severity": "high",
+      "description": "Median utilization across TN public DC chargers is 8-12% (vs ~20% needed for 3-year payback). Many AC chargers sit idle outside peak commuting windows.",
+      "impact": "Negative unit economics on ~40% of public stations; operators are subsidizing.",
+      "solutions": [
+        "Dynamic pricing: peak/off-peak rates (INR 22 peak, INR 14 off-peak) to spread demand.",
+        "B2B fleet contracts (Ola, Uber, BluSmart, Lithium Urban, Magenta) with minimum guaranteed sessions.",
+        "Drop AC chargers at low-traffic sites; consolidate to fewer DC bays at high-traffic sites (Pareto)."
+      ]
+    },
+    {
+      "id": "CH-04",
+      "title": "Interoperability and roaming",
+      "severity": "medium",
+      "description": "Each operator (Tata Power, Ather, Statiq, ChargeZone, Jio-bp, Glida) requires its own app and wallet; OCPI roaming is still patchy.",
+      "impact": "User friction, abandoned sessions, and lower utilization for smaller operators.",
+      "solutions": [
+        "Adopt OCPI 2.2.1 from day one and join the Bharat Charge Alliance roaming hub.",
+        "Accept open payment (UPI QR + RFID) at every charger; do not require app install for guest sessions.",
+        "Publish real-time CSMS feed to PlugShare, Ather Grid, Google Maps EV layer."
+      ]
+    },
+    {
+      "id": "CH-05",
+      "title": "Charger reliability and uptime",
+      "severity": "medium",
+      "description": "Industry uptime for DC chargers in India is 88-93%. Failures: connector damage, RFID reader, comms loss, payment hang.",
+      "impact": "Lost revenue (each hour of downtime ~ INR 350-900 lost), and PlugShare reviews compound the brand hit.",
+      "solutions": [
+        "CSMS with active polling every 60s and auto-ticket to field-ops if any fault > 15 min.",
+        "Stock common spare parts (CCS2 gun INR 28k, contactor INR 6k) within 100 km of each cluster.",
+        "Tie OEM SLAs to uptime (>97%) with liquidated damages."
+      ]
+    },
+    {
+      "id": "CH-06",
+      "title": "Highway gap and range anxiety",
+      "severity": "medium",
+      "description": "NH48 Chennai-Bengaluru has ~6 working fast chargers; NH44 Salem-Madurai has <4. Long stretches >120 km without reliable DC charging.",
+      "impact": "Suppresses 4-wheeler EV adoption for inter-city travel; commercial fleet adoption blocked.",
+      "solutions": [
+        "Target every 60-80 km on NH48/NH44/NH32/ECR; 4x120 kW CCS2 + 1x240 kW per highway site.",
+        "Apply under MHI PM-eDrive scheme (CapEx subsidy up to 70% for highway DC).",
+        "Anchor highway sites at existing fuel retail / Highway food courts (A1 Plaza, Adyar Ananda Bhavan highway branches)."
+      ]
+    },
+    {
+      "id": "CH-07",
+      "title": "Vandalism and safety",
+      "severity": "low",
+      "description": "Unmanned sites face cable theft, connector damage, and EV-on-fire incidents (rare but high-impact).",
+      "impact": "Insurance premiums up 30-50% YoY; site shutdowns post-incident.",
+      "solutions": [
+        "24x7 IP camera + motion alerts; tie-up with local security agency for night patrol.",
+        "Mandatory IEC 61851 + AIS 138 compliant chargers; thermal cutoff on every bay.",
+        "Public liability insurance INR 1 crore per site."
+      ]
+    },
+    {
+      "id": "CH-08",
+      "title": "Skilled technician shortage",
+      "severity": "low",
+      "description": "Few certified EV charger technicians in Tier-2 TN towns; OEM training pipelines just starting.",
+      "impact": "MTTR (mean time to repair) is 36-72 hours in Tier-2; 6-12 hours in Chennai.",
+      "solutions": [
+        "Sponsor 2-week certification under ASDC (Automotive Skills Dev Council) for ITI graduates; hire-and-train model.",
+        "Regional ops hubs (Chennai, Coimbatore, Madurai, Trichy) each owning 5-8 stations within 80 km."
+      ]
+    }
+  ]
+}

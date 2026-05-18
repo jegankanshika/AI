@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EV Charging Co-Pilot · Tamil Nadu</title>
+<style>
+  :root {
+    --bg:#0b0f14; --panel:#121821; --panel-2:#1a2230; --ink:#e6edf3;
+    --muted:#8b9bb0; --accent:#22c55e; --accent-2:#38bdf8; --warn:#f59e0b; --bad:#ef4444;
+    --border:#243044;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background:var(--bg); color:var(--ink); font-family: -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; }
+  header { padding:14px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; background:linear-gradient(180deg,#0d141d, #0b0f14); }
+  header h1 { font-size:18px; margin:0; font-weight:600; letter-spacing:0.2px; }
+  header .tag { font-size:11px; padding:3px 8px; border:1px solid var(--border); border-radius:999px; color:var(--muted); }
+  nav { display:flex; gap:4px; padding:8px 16px; border-bottom:1px solid var(--border); overflow-x:auto; background:var(--panel); }
+  nav button { background:transparent; color:var(--muted); border:1px solid transparent; padding:8px 14px; border-radius:8px; cursor:pointer; font-size:13px; white-space:nowrap; }
+  nav button.active { background:var(--panel-2); color:var(--ink); border-color:var(--border); }
+  nav button:hover { color:var(--ink); }
+  main { padding:18px 22px; max-width:1300px; margin:0 auto; }
+  .grid { display:grid; gap:14px; }
+  .grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(380px,1fr)); }
+  .grid.cols-3 { grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .card h3 { margin:0 0 8px 0; font-size:14px; font-weight:600; color:var(--ink); letter-spacing:0.2px; }
+  .card .kv { display:flex; justify-content:space-between; padding:4px 0; font-size:13px; color:var(--muted); border-bottom:1px dashed #1f2a3c; }
+  .card .kv span:last-child { color:var(--ink); }
+  .stat { font-size:24px; font-weight:600; color:var(--accent); }
+  .stat-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; }
+  tr:hover td { background:#16202d; }
+  .pill { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted); }
+  .pill.high { background:#3b0f12; border-color:#7f1d1d; color:#fca5a5; }
+  .pill.medium { background:#3a2906; border-color:#92400e; color:#fcd34d; }
+  .pill.low { background:#0f2c1a; border-color:#166534; color:#86efac; }
+  .pill.hw { background:#0c2030; border-color:#1e3a5f; color:#93c5fd; }
+  input, select, textarea, button.primary {
+    background:var(--panel-2); color:var(--ink); border:1px solid var(--border);
+    padding:8px 12px; border-radius:8px; font-size:13px; font-family:inherit;
+  }
+  button.primary { background:var(--accent); color:#04150b; font-weight:600; cursor:pointer; border:none; }
+  button.primary:hover { background:#16a34a; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .muted { color:var(--muted); font-size:12px; }
+  .ask-out { white-space:pre-wrap; background:#0a1320; padding:12px; border-radius:8px; border:1px solid var(--border); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:12px; color:#cfe6ff; max-height:420px; overflow:auto; }
+  details { margin-top:10px; }
+  details summary { cursor:pointer; color:var(--accent-2); font-size:13px; }
+  .legend { font-size:11px; color:var(--muted); padding-top:6px; }
+  .right { margin-left:auto; }
+  .hidden { display:none; }
+  a { color:var(--accent-2); text-decoration:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ EV Charging Co-Pilot</h1>
+  <span class="tag">Tamil Nadu · Market intel + site planning</span>
+  <span class="right tag" id="asof">loading…</span>
+</header>
+<nav>
+  <button data-view="dashboard" class="active">Dashboard</button>
+  <button data-view="registrations">Registered EVs</button>
+  <button data-view="stations">Charging Stations</button>
+  <button data-view="economics">Station P&amp;L</button>
+  <button data-view="challenges">Challenges</button>
+  <button data-view="future">Future Locations</button>
+  <button data-view="partners">Partners &amp; Contacts</button>
+  <button data-view="setup">Setup Plans</button>
+  <button data-view="forecast">Growth Forecast</button>
+  <button data-view="chargers">Charger Types</button>
+  <button data-view="calculator">Charger Calculator</button>
+  <button data-view="ask">Ask the Agent</button>
+</nav>
+<main id="root"></main>
+
+<script>
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+const fmt = (n) => n == null ? "—" : Number(n).toLocaleString("en-IN");
+const inr = (n) => "₹" + fmt(n);
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
+}
+
+const views = {};
+
+views.dashboard = async () => {
+  const [reg, st, ch, future] = await Promise.all([
+    api("/registrations/summary"),
+    api("/economics"),
+    api("/challenges"),
+    api("/future?scope=chennai&top_n=3")
+  ]);
+  return `
+    <div class="grid cols-3">
+      <div class="card"><h3>Registered EVs in TN</h3>
+        <div class="stat">${fmt(reg.total)}</div>
+        <div class="stat-sub">across ${reg.districts_covered} districts · as of ${reg.as_of}</div>
+        <div class="kv"><span>Two-wheelers</span><span>${fmt(reg.two_wheeler)}</span></div>
+        <div class="kv"><span>Three-wheelers</span><span>${fmt(reg.three_wheeler)}</span></div>
+        <div class="kv"><span>Four-wheelers</span><span>${fmt(reg.four_wheeler)}</span></div>
+        <div class="kv"><span>Bus / Truck</span><span>${fmt(reg.bus_truck)}</span></div>
+      </div>
+      <div class="card"><h3>Public Charging Portfolio</h3>
+        <div class="stat">${fmt(st.totals.total_stations)} stations</div>
+        <div class="stat-sub">${fmt(st.totals.chennai_stations)} Chennai · ${fmt(st.totals.highway_stations)} highway · uptime ${st.totals.avg_uptime_pct}%</div>
+        <div class="kv"><span>Sessions (30d)</span><span>${fmt(st.totals.total_sessions_30d)}</span></div>
+        <div class="kv"><span>Revenue (30d)</span><span>${inr(st.totals.total_revenue_30d_inr)}</span></div>
+        <div class="kv"><span>Expenses (30d)</span><span>${inr(st.totals.total_expenses_30d_inr)}</span></div>
+        <div class="kv"><span>Gross margin</span><span>${inr(st.totals.total_revenue_30d_inr - st.totals.total_expenses_30d_inr)}</span></div>
+      </div>
+      <div class="card"><h3>Open Challenges</h3>
+        <div class="stat">${fmt(ch.count)}</div>
+        <div class="stat-sub">${ch.challenges.filter(c=>c.severity==='high').length} high · ${ch.challenges.filter(c=>c.severity==='medium').length} medium · ${ch.challenges.filter(c=>c.severity==='low').length} low</div>
+        ${ch.challenges.slice(0,4).map(c => `<div class="kv"><span>${c.title}</span><span class="pill ${c.severity}">${c.severity}</span></div>`).join("")}
+      </div>
+    </div>
+    <div class="grid cols-2" style="margin-top:14px">
+      <div class="card"><h3>Top recommended Chennai sites</h3>
+        <table><thead><tr><th>#</th><th>Location</th><th>Score</th><th>Payback</th></tr></thead>
+        <tbody>${future.locations.map(l=>`<tr><td>${l.rank}</td><td>${l.name}</td><td>${l.score}</td><td>${l.payback_months} mo</td></tr>`).join("")}</tbody></table>
+      </div>
+      <div class="card"><h3>How to use</h3>
+        <p class="muted">Browse tabs above for district-wise EV counts, station economics, partner contacts, and lowest-cost setup plans. Or type a natural-language question on the <b>Ask the Agent</b> tab.</p>
+        <p class="muted">Live APIs: <code>/registrations</code>, <code>/stations</code>, <code>/economics</code>, <code>/challenges</code>, <code>/future?scope=chennai|highway</code>, <code>/partners</code>, <code>/setup?mode=solo|partner|all</code>, <code>/forecast</code>, <code>POST /ask</code>.</p>
+      </div>
+    </div>`;
+};
+
+views.registrations = async () => {
+  const d = await api("/registrations?top_n=40");
+  return `
+    <div class="card">
+      <h3>Registered EVs in Tamil Nadu — district wise</h3>
+      <div class="muted">${d.source}</div>
+      <table style="margin-top:10px"><thead>
+        <tr><th>District</th><th>Total EVs</th><th>2W</th><th>3W</th><th>4W</th><th>Bus/Truck</th><th>RTO offices (registered locations)</th></tr>
+      </thead><tbody>
+      ${d.districts.map(r => `
+        <tr>
+          <td><b>${r.district}</b></td>
+          <td>${fmt(r.registered_evs)}</td>
+          <td>${fmt(r.two_wheeler)}</td>
+          <td>${fmt(r.three_wheeler)}</td>
+          <td>${fmt(r.four_wheeler)}</td>
+          <td>${fmt(r.bus_truck)}</td>
+          <td class="muted">${(r.rto_offices||[]).join(", ")}</td>
+        </tr>`).join("")}
+      </tbody></table>
+    </div>`;
+};
+
+views.stations = async () => {
+  const [all, hw] = await Promise.all([api("/stations"), api("/stations?highway_only=true")]);
+  const rows = (lst) => lst.stations.map(s => `
+    <tr>
+      <td><b>${s.name}</b><div class="muted">${s.id} · ${s.operator}</div></td>
+      <td>${s.district} ${s.highway?'<span class="pill hw">highway</span>':''}</td>
+      <td class="muted">${s.location}</td>
+      <td>${s.connectors.map(c=>`${c.count}× ${c.type} ${c.kw}kW`).join("<br>")}</td>
+      <td>${s.uptime_pct}%</td>
+      <td><a href="https://www.google.com/maps?q=${s.lat},${s.lng}" target="_blank">map</a></td>
+    </tr>`).join("");
+  return `
+    <div class="card"><h3>All public charging stations (${all.count})</h3>
+      <table><thead><tr><th>Station</th><th>District</th><th>Address</th><th>Connectors</th><th>Uptime</th><th>Map</th></tr></thead>
+      <tbody>${rows(all)}</tbody></table>
+    </div>
+    <div class="card" style="margin-top:14px"><h3>Highway stations (${hw.count})</h3>
+      <table><thead><tr><th>Station</th><th>District</th><th>Address</th><th>Connectors</th><th>Uptime</th><th>Map</th></tr></thead>
+      <tbody>${rows(hw)}</tbody></table>
+    </div>`;
+};
+
+views.economics = async () => {
+  const d = await api("/economics");
+  return `
+    <div class="card"><h3>Per-station economics (last 30 days)</h3>
+      <table><thead><tr>
+        <th>Station</th><th>District</th><th>Sessions</th><th>Revenue</th><th>Expenses</th><th>Gross</th><th>Margin %</th><th>₹/session</th><th>Uptime</th>
+      </tr></thead><tbody>
+      ${d.portfolio.map(r=>`
+        <tr>
+          <td><b>${r.name}</b><div class="muted">${r.id}</div></td>
+          <td>${r.district} ${r.highway?'<span class="pill hw">hw</span>':''}</td>
+          <td>${fmt(r.sessions_30d)}</td>
+          <td>${inr(r.revenue_30d_inr)}</td>
+          <td>${inr(r.expenses_30d_inr)}</td>
+          <td>${inr(r.gross_margin_inr)}</td>
+          <td>${r.gross_margin_pct}%</td>
+          <td>${inr(r.revenue_per_session_inr)}</td>
+          <td>${r.uptime_pct}%</td>
+        </tr>`).join("")}
+      </tbody></table>
+    </div>`;
+};
+
+views.challenges = async () => {
+  const d = await api("/challenges");
+  return `<div class="grid cols-2">${d.challenges.map(c=>`
+    <div class="card">
+      <h3>${c.title} <span class="pill ${c.severity}" style="margin-left:6px">${c.severity}</span></h3>
+      <p class="muted">${c.description}</p>
+      <div class="kv"><span>Impact</span><span>${c.impact}</span></div>
+      <details open><summary>Solutions (${c.solutions.length})</summary>
+        <ul>${c.solutions.map(s=>`<li>${s}</li>`).join("")}</ul>
+      </details>
+    </div>`).join("")}</div>`;
+};
+
+views.future = async () => {
+  const [chennai, highway] = await Promise.all([
+    api("/future?scope=chennai&top_n=10"),
+    api("/future?scope=highway&top_n=10")
+  ]);
+  const tbl = (d) => `
+    <table><thead><tr>
+      <th>#</th><th>Location</th><th>Score</th><th>Config</th><th>CapEx</th><th>Payback</th><th>Why</th><th>Map</th>
+    </tr></thead><tbody>${d.locations.map(l=>`
+      <tr>
+        <td>${l.rank}</td>
+        <td><b>${l.name}</b></td>
+        <td>${l.score}</td>
+        <td>${l.recommended_config}</td>
+        <td>${inr(l.estimated_capex_inr)}</td>
+        <td>${l.payback_months} mo</td>
+        <td class="muted">${l.rationale}</td>
+        <td><a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank">map</a></td>
+      </tr>`).join("")}</tbody></table>`;
+  return `
+    <div class="card"><h3>Inside Chennai — top sites</h3><div class="muted">${chennai.model}</div>${tbl(chennai)}</div>
+    <div class="card" style="margin-top:14px"><h3>Highway — top sites</h3>${tbl(highway)}</div>`;
+};
+
+views.partners = async () => {
+  const d = await api("/partners");
+  return d.categories.map(cat => `
+    <div class="card" style="margin-bottom:14px">
+      <h3>${cat.category}</h3>
+      <div class="muted"><b>Playbook:</b> ${cat.playbook}</div>
+      <table style="margin-top:8px"><thead><tr>
+        <th>Org</th><th>Role</th><th>Address</th><th>Phone</th><th>Email</th><th>Notes</th>
+      </tr></thead><tbody>
+      ${cat.contacts.map(c=>`
+        <tr>
+          <td><b>${c.name}</b></td>
+          <td>${c.role}</td>
+          <td class="muted">${c.address}</td>
+          <td>${c.phone}</td>
+          <td><a href="mailto:${c.email}">${c.email}</a></td>
+          <td class="muted">${c.notes}</td>
+        </tr>`).join("")}
+      </tbody></table>
+    </div>`).join("");
+};
+
+views.setup = async () => {
+  const d = await api("/setup");
+  const solo = d.lowest_cost_individual;
+  return `
+    <div class="card"><h3>Lowest-cost individual plan — ${solo.name}</h3>
+      <div class="muted">${solo.target}</div>
+      <div class="grid cols-3" style="margin-top:10px">
+        <div class="card"><h3>CapEx</h3>
+          <div class="stat">${inr(solo.capex_total_inr)}</div>
+          ${solo.capex_line_items.map(i=>`<div class="kv"><span>${i.item}</span><span>${inr(i.amount)}</span></div>`).join("")}
+        </div>
+        <div class="card"><h3>Monthly OpEx</h3>
+          <div class="stat">${inr(solo.monthly_opex_inr.total)}</div>
+          ${Object.entries(solo.monthly_opex_inr).filter(([k])=>k!=="total").map(([k,v])=>`<div class="kv"><span>${k.replaceAll("_"," ")}</span><span>${inr(v)}</span></div>`).join("")}
+        </div>
+        <div class="card"><h3>Revenue assumptions</h3>
+          <div class="stat">${inr(solo.revenue_assumptions.monthly_revenue_inr)}<span class="muted" style="font-size:12px">/mo</span></div>
+          <div class="kv"><span>Sessions/day</span><span>${solo.revenue_assumptions.sessions_per_day}</span></div>
+          <div class="kv"><span>Avg kWh/session</span><span>${solo.revenue_assumptions.avg_kwh_per_session}</span></div>
+          <div class="kv"><span>Tariff INR/kWh</span><span>${solo.revenue_assumptions.avg_tariff_inr_per_kwh}</span></div>
+          <div class="kv"><span>Payback</span><span><b>${solo.payback_months} months</b></span></div>
+        </div>
+      </div>
+      <details style="margin-top:12px" open><summary>Applicable subsidies</summary>
+        <ul>${solo.applicable_subsidies.map(s=>`<li>${s}</li>`).join("")}</ul>
+      </details>
+    </div>
+    <div class="card" style="margin-top:14px"><h3>Partner vendor models</h3>
+      <table><thead><tr><th>Model</th><th>Owner CapEx</th><th>Revenue split</th><th>Payback</th><th>Pros</th><th>Cons</th></tr></thead>
+      <tbody>${d.partner_vendor_models.map(p=>`
+        <tr>
+          <td><b>${p.model}</b><div class="muted">${p.description}</div></td>
+          <td>${inr(p.owner_capex_inr)}</td>
+          <td>${p.revenue_split || "—"}</td>
+          <td>${p.payback_months} mo</td>
+          <td><ul style="margin:0;padding-left:18px">${p.pros.map(x=>`<li>${x}</li>`).join("")}</ul></td>
+          <td><ul style="margin:0;padding-left:18px">${p.cons.map(x=>`<li>${x}</li>`).join("")}</ul></td>
+        </tr>`).join("")}</tbody></table>
+    </div>
+    <div class="card" style="margin-top:14px"><h3>Side-by-side comparison</h3>
+      <table><thead><tr><th>Plan</th><th>CapEx</th><th>Payback</th><th>Margin profile</th><th>Best for</th></tr></thead>
+      <tbody>${d.comparison_summary.map(r=>`
+        <tr><td><b>${r.plan}</b></td><td>${inr(r.capex_inr)}</td><td>${r.payback_months} mo</td><td>${r.margin_profile}</td><td>${r.best_for}</td></tr>`).join("")}</tbody></table>
+    </div>`;
+};
+
+views.forecast = async () => {
+  const d = await api("/forecast");
+  return `
+    <div class="card"><h3>TN EV stock forecast</h3>
+      <div class="muted">${d.method}</div>
+      <table style="margin-top:10px"><thead><tr><th>Year</th><th>2W</th><th>3W</th><th>4W</th><th>Bus/Truck</th><th>Total</th></tr></thead>
+      <tbody>${d.tn_ev_stock_forecast.map(r=>`<tr><td>${r.year}</td><td>${fmt(r.two_wheeler)}</td><td>${fmt(r.three_wheeler)}</td><td>${fmt(r.four_wheeler)}</td><td>${fmt(r.bus_truck)}</td><td><b>${fmt(r.total)}</b></td></tr>`).join("")}</tbody></table>
+    </div>
+    <div class="card" style="margin-top:14px"><h3>Public charging demand</h3>
+      <table><thead><tr><th>Year</th><th>Public chargers needed</th><th>Highway DC</th><th>City DC</th><th>City AC</th></tr></thead>
+      <tbody>${d.public_charging_demand_forecast.map(r=>`<tr><td>${r.year}</td><td>${fmt(r.public_chargers_needed)}</td><td>${fmt(r.highway_dc_needed)}</td><td>${fmt(r.city_dc_needed)}</td><td>${fmt(r.city_ac_needed)}</td></tr>`).join("")}</tbody></table>
+    </div>
+    <div class="card" style="margin-top:14px"><h3>Industry revenue + capex (₹ Cr)</h3>
+      <table><thead><tr><th>Year</th><th>Revenue ₹Cr</th><th>CapEx ₹Cr</th><th>Active operators</th></tr></thead>
+      <tbody>${d.industry_revenue_forecast_tn_inr_cr.map(r=>`<tr><td>${r.year}</td><td>${fmt(r.revenue_cr)}</td><td>${fmt(r.capex_cr)}</td><td>${fmt(r.addressable_operators)}</td></tr>`).join("")}</tbody></table>
+    </div>
+    <div class="grid cols-2" style="margin-top:14px">
+      <div class="card"><h3>Key drivers</h3><ul>${d.key_drivers.map(x=>`<li>${x}</li>`).join("")}</ul></div>
+      <div class="card"><h3>Risks</h3><ul>${d.risks.map(x=>`<li>${x}</li>`).join("")}</ul></div>
+    </div>`;
+};
+
+views.chargers = async () => {
+  const d = await api("/charger-types");
+  return `
+    <div class="card"><h3>All available charger types (${d.count})</h3>
+      <div class="muted">Sorted by kW. Each row shows benefits, ideal usage window, and per-unit equipment CapEx.</div>
+      <table style="margin-top:8px"><thead><tr>
+        <th>Charger</th><th>Type</th><th>kW</th><th>Connector</th><th>Per-session</th><th>Equip. CapEx</th><th>Best timing</th><th>Vehicles</th>
+      </tr></thead><tbody>
+      ${d.chargers.map(c=>`
+        <tr>
+          <td><b>${c.label}</b><div class="muted">${c.id} · OCPP ${c.ocpp}</div></td>
+          <td><span class="pill ${c.current_type.startsWith('DC')?'hw':''}">${c.current_type}</span></td>
+          <td><b>${c.kw}</b> <span class="muted">kW</span><div class="muted">${c.voltage}, ${c.amps} A</div></td>
+          <td>${c.connector}</td>
+          <td>${c.typical_session_hours} h<br><span class="muted">${c.typical_kwh_per_session} kWh</span></td>
+          <td>${inr(c.equipment_capex_inr)}</td>
+          <td class="muted">${c.best_usage_timing}</td>
+          <td class="muted">${(c.vehicles||[]).join(", ")}</td>
+        </tr>
+        <tr><td colspan="8" style="border-bottom:1px solid var(--border); padding:8px 10px; background:#0e1620">
+          <b>Best use:</b> ${c.best_use}
+          <details style="margin-top:4px"><summary>Benefits (${c.benefits.length}) · Limitations (${(c.limitations||[]).length})</summary>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:6px">
+              <div><b>Benefits</b><ul>${c.benefits.map(b=>`<li>${b}</li>`).join("")}</ul></div>
+              <div><b>Limitations</b><ul>${(c.limitations||[]).map(b=>`<li>${b}</li>`).join("")}</ul></div>
+            </div>
+          </details>
+        </td></tr>
+      `).join("")}
+      </tbody></table>
+    </div>`;
+};
+
+views.calculator = async () => {
+  const [cat, eff] = await Promise.all([
+    api("/charger-types"),
+    api("/setup/effective?site_class=city&utilization_pct=100")
+  ]);
+  const rows = cat.chargers.map(c => `
+    <tr>
+      <td><b>${c.label}</b> <span class="muted">(${c.kw} kW, ${c.current_type})</span></td>
+      <td>${inr(c.equipment_capex_inr)}</td>
+      <td><input type="number" min="0" max="20" value="0" data-id="${c.id}" class="qty" style="width:64px"/></td>
+    </tr>`).join("");
+  return `
+    <div class="grid cols-2">
+      <div class="card"><h3>Build your own — choose chargers</h3>
+        <div class="row" style="margin-bottom:10px">
+          <label>Site class
+            <select id="site_class">
+              <option value="city" selected>City</option>
+              <option value="highway">Highway</option>
+              <option value="depot">Depot / fleet</option>
+            </select>
+          </label>
+          <label>Utilization %
+            <input id="utilization" type="number" min="20" max="160" value="100" style="width:72px"/>
+          </label>
+          <button class="primary" id="compute">Compute</button>
+        </div>
+        <table><thead><tr><th>Charger</th><th>Equip CapEx</th><th>Qty</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+      </div>
+      <div class="card"><h3>Most effective charger (annual ROI)</h3>
+        <div class="muted">Ranking assumes site_class=city, utilization=100 %.</div>
+        <div style="margin-top:8px; padding:10px; background:#0e1620; border:1px solid var(--border); border-radius:8px">
+          <div class="stat" style="color:var(--accent-2)">${eff.most_effective.label}</div>
+          <div class="stat-sub">${eff.most_effective.current_type} · ${eff.most_effective.kw} kW · annual ROI ${eff.most_effective.annual_roi_pct} %</div>
+          <div class="kv"><span>CapEx total</span><span>${inr(eff.most_effective.capex_total_inr)}</span></div>
+          <div class="kv"><span>Monthly gross</span><span>${inr(eff.most_effective.monthly_gross_margin_inr)}</span></div>
+          <div class="kv"><span>Payback</span><span>${eff.most_effective.payback_months} mo</span></div>
+          <div class="muted" style="margin-top:6px"><b>Best use:</b> ${eff.most_effective.best_use}</div>
+          <div class="muted"><b>Timing:</b> ${eff.most_effective.best_usage_timing}</div>
+        </div>
+        <details style="margin-top:10px" open><summary>Full ranking (${eff.ranking.length})</summary>
+          <table style="margin-top:6px"><thead><tr><th>#</th><th>Charger</th><th>kW</th><th>Annual ROI</th><th>Payback</th></tr></thead>
+          <tbody>${eff.ranking.map((r,i)=>`<tr><td>${i+1}</td><td>${r.label}</td><td>${r.kw}</td><td>${r.annual_roi_pct}%</td><td>${r.payback_months ?? "—"} mo</td></tr>`).join("")}</tbody></table>
+        </details>
+      </div>
+    </div>
+    <div class="card" id="calc-out" style="margin-top:14px; display:none"></div>`;
+};
+
+async function runCalculator() {
+  const sels = $$(".qty").map(i => ({id: i.dataset.id, count: Number(i.value)||0})).filter(x => x.count > 0);
+  const out = $("#calc-out");
+  if (!sels.length) {
+    out.style.display = "block";
+    out.innerHTML = `<div class="muted">Pick at least one charger quantity above.</div>`;
+    return;
+  }
+  const body = {selections: sels, utilization_pct: Number($("#utilization").value)||100, site_class: $("#site_class").value};
+  out.style.display = "block";
+  out.innerHTML = `<div class="muted">Computing…</div>`;
+  try {
+    const r = await fetch("/setup/custom", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify(body)});
+    const j = await r.json();
+    if (!r.ok) { out.innerHTML = `<div style="color:#fca5a5">${j.detail || "error"}</div>`; return; }
+    const t = j.totals;
+    out.innerHTML = `
+      <h3>Your custom plan — ${t.bays} bay${t.bays>1?'s':''}, ${t.installed_kw} kW total · ${j.site_class}, ${j.utilization_pct}% utilization</h3>
+      <div class="grid cols-3" style="margin-top:8px">
+        <div class="card"><h3>CapEx breakdown</h3>
+          <div class="stat">${inr(t.capex_total_inr)}</div>
+          <div class="kv"><span>Equipment</span><span>${inr(t.equipment_capex_inr)}</span></div>
+          <div class="kv"><span>Civil (per bay)</span><span>${inr(t.civil_inr)}</span></div>
+          <div class="kv"><span>Panel + cabling</span><span>${inr(t.panel_inr)}</span></div>
+          <div class="kv"><span>Transformer share</span><span>${inr(t.transformer_inr)}</span></div>
+          <div class="kv"><span>CSMS setup</span><span>${inr(t.csms_setup_inr)}</span></div>
+          <div class="kv"><span>Signage + IoT + CCTV</span><span>${inr(t.signage_iot_cctv_inr)}</span></div>
+          <div class="kv"><span>Permits + PM</span><span>${inr(t.permits_pm_inr)}</span></div>
+          <div class="kv"><span>Contingency 8%</span><span>${inr(t.contingency_inr)}</span></div>
+        </div>
+        <div class="card"><h3>Monthly OpEx + revenue</h3>
+          <div class="stat">${inr(t.monthly_gross_margin_inr)}<span class="muted" style="font-size:12px"> gross/mo</span></div>
+          <div class="kv"><span>Monthly revenue</span><span>${inr(t.monthly_revenue_inr)}</span></div>
+          <div class="kv"><span>Monthly OpEx</span><span>${inr(t.monthly_opex_inr)}</span></div>
+          <div class="kv"><span>Payback</span><span><b>${t.payback_months ?? "—"} months</b></span></div>
+          <div class="kv"><span>Annual kWh delivered</span><span>${fmt(t.annual_kwh_delivered)}</span></div>
+        </div>
+        <div class="card"><h3>Selection lines</h3>
+          ${j.selections.map(l=>`<div class="kv"><span>${l.count} × ${l.label}</span><span>${inr(l.line_equipment_capex_inr)}</span></div>`).join("")}
+        </div>
+      </div>
+      <details style="margin-top:10px" open><summary>Applicable subsidies</summary>
+        <ul>${j.applicable_subsidies.map(s=>`<li>${s}</li>`).join("")}</ul>
+      </details>`;
+  } catch (e) {
+    out.innerHTML = `<div style="color:#fca5a5">${e.message}</div>`;
+  }
+}
+
+views.ask = async () => {
+  return `
+    <div class="card"><h3>Ask the EV Co-Pilot</h3>
+      <p class="muted">Examples: "How many EVs in Coimbatore?" · "Show highway stations" · "Lowest cost setup plan" · "Future locations in Chennai" · "Partners for fuel retail co-location" · "Growth forecast"</p>
+      <div class="row">
+        <input id="q" style="flex:1; min-width:280px" placeholder="Ask something…" value="Give me a full TN EV charging market summary" />
+        <button class="primary" id="go">Ask</button>
+      </div>
+      <div id="out" style="margin-top:12px"></div>
+    </div>`;
+};
+
+async function runAsk() {
+  const q = $("#q").value.trim();
+  const out = $("#out");
+  out.innerHTML = `<div class="muted">Thinking…</div>`;
+  try {
+    const r = await fetch("/ask", {method:"POST", headers:{"content-type":"application/json"}, body: JSON.stringify({question:q})});
+    const j = await r.json();
+    out.innerHTML = `
+      <div class="card"><h3>Intent: ${j.intent}</h3>
+        <p>${j.summary}</p>
+        <details><summary>Tool calls (${j.tool_calls.length})</summary>
+          <ul>${j.tool_calls.map(t=>`<li><code>${t.name}</code> ${JSON.stringify(t.args)}</li>`).join("")}</ul>
+        </details>
+        <details open><summary>Data payload</summary>
+          <div class="ask-out">${JSON.stringify(j.data,null,2).replace(/</g,"&lt;")}</div>
+        </details>
+        ${j.citations.length?`<div class="legend">Sources: ${j.citations.join(" · ")}</div>`:""}
+      </div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="card" style="border-color:#7f1d1d">Error: ${e.message}</div>`;
+  }
+}
+
+async function mount(view) {
+  $$("nav button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  const html = await views[view]();
+  $("#root").innerHTML = html;
+  if (view === "ask") {
+    $("#go").addEventListener("click", runAsk);
+    $("#q").addEventListener("keydown", e => { if (e.key === "Enter") runAsk(); });
+  }
+  if (view === "calculator") {
+    $("#compute").addEventListener("click", runCalculator);
+  }
+}
+
+$$("nav button").forEach(b => b.addEventListener("click", () => mount(b.dataset.view).catch(showErr)));
+
+function showErr(e) { $("#root").innerHTML = `<div class="card" style="border-color:#7f1d1d">${e.message}</div>`; }
+
+(async () => {
+  try {
+    const reg = await api("/registrations/summary");
+    $("#asof").textContent = "data as of " + reg.as_of;
+  } catch {}
+  mount("dashboard").catch(showErr);
+})();
+</script>
+</body>
+</html>
