@@ -102,6 +102,22 @@ def test_api_stations_highway_only():
     assert all(s["highway"] for s in j["stations"])
 
 
+def test_stations_portfolio_summary():
+    s = stations.portfolio_summary()
+    assert s["total_charging_stations"] == len(stations.list_stations()["stations"])
+    classes = s["by_site_class"]
+    assert classes["chennai_city"] + classes["highway"] + classes["it_park"] + classes["other_city"] == s["total_charging_stations"]
+    assert s["total_bays"] > 0 and s["total_installed_kw"] > 0
+    assert {"CCS2", "Type2 AC"}.issubset({c["type"] for c in s["connectors"]})
+
+
+def test_api_stations_summary():
+    r = client.get("/stations/summary")
+    assert r.status_code == 200
+    j = r.json()
+    assert j["total_charging_stations"] >= 30
+
+
 def test_api_stations_it_park_filter():
     r = client.get("/stations", params={"site_class": "it_park"})
     assert r.status_code == 200
